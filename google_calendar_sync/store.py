@@ -5,7 +5,6 @@ from __future__ import annotations
 from abc import ABC
 
 
-
 class CalendarStore(ABC):
     """Interface for external calendar storage."""
 
