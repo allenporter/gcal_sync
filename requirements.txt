@@ -1,3 +1,8 @@
+black==22.3.0
+click==8.1.2
+flake8==4.0.1
+flake8-black==0.2.3
 google-api-python-client==2.38.0
+pre-commit==2.18.1
 pytest==6.2.5
 pytest-asyncio==0.18.3
