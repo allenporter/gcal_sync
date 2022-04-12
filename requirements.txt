@@ -7,5 +7,6 @@ google-api-python-client==2.38.0
 mypy==0.942
 pre-commit==2.18.1
 pylint==2.13.5
-pytest-asyncio==0.18.3
 pytest==6.2.5
+pytest-asyncio==0.18.3
+pytest-cov==3.0.0
