@@ -38,6 +38,7 @@ class Datetime(BaseModel):
 
     @root_validator
     def check_date_or_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Validate the date or datetime fields are set properly."""
         if not values.get("date") and not values.get("date_time"):
             raise ValueError("Unexpected missing date or dateTime value")
         return values

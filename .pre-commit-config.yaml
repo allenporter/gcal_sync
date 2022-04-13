@@ -31,3 +31,15 @@ repos:
     # use require_serial so that script
     # is only called once per commit
     require_serial: true
+- repo: local
+  hooks:
+  - id: pylint
+    name: pylint
+    entry: pylint
+    language: system
+    types: [python]
+    args:
+      [
+        "-rn", # Only display messages
+        "-sn", # Don't display the score
+      ]
