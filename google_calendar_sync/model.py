@@ -1,11 +1,11 @@
-"""Library for data model for local calendar objects."""
+"Library for data model for local calendar objects." ""
 
 from __future__ import annotations
 
 import datetime
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, Field, root_validator
 
 DATE_STR_FORMAT = "%Y-%m-%d"
 
@@ -20,32 +20,36 @@ class Calendar(BaseModel):
     timezone: Optional[str]
 
 
+class Datetime(BaseModel):
+    """A date or datetime."""
+
+    date: Optional[datetime.date]
+    date_time: Optional[datetime.datetime] = Field(alias="dateTime")
+    timezone: Optional[str] = Field(alias="timeZone")
+
+    @property
+    def value(self) -> Union[datetime.date, datetime.datetime]:
+        """Return either a datetime or date representing the Datetime."""
+        if self.date is not None:
+            return self.date
+        if self.date_time is not None:
+            return self.date_time
+        raise ValueError("Datetime has invalid state with no date or date_time")
+
+    @root_validator
+    def check_date_or_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if not values.get("date") and not values.get("date_time"):
+            raise ValueError("Unexpected missing date or dateTime value")
+        return values
+
+
 class Event(BaseModel):
     """A single event on a calendar."""
 
     id: str
     summary: str
-    start: Union[datetime.datetime, datetime.date]
-    end: Union[datetime.datetime, datetime.date]
+    start: Datetime
+    end: Datetime
     description: Optional[str]
     location: Optional[str]
-
-    @validator("start", pre=True)
-    def start_date_from_api(cls, v: Any) -> Union[datetime.date, datetime.datetime]:
-        if not isinstance(v, dict):
-            raise ValueError("Unexpected value was not dictionary")
-        if "dateTime" in v:
-            return datetime.datetime.fromisoformat(v["dateTime"])
-        if "date" in v:
-            return datetime.datetime.strptime(v["date"], DATE_STR_FORMAT).date()
-        raise ValueError("Unexpected missing date or dateTime value")
-
-    @validator("end", pre=True)
-    def end_date_from_api(cls, v: Any) -> Union[datetime.date, datetime.datetime]:
-        if not isinstance(v, dict):
-            raise ValueError("Unexpected value was not dictionary")
-        if "dateTime" in v:
-            return datetime.datetime.fromisoformat(v["dateTime"])
-        if "date" in v:
-            return datetime.datetime.strptime(v["date"], DATE_STR_FORMAT).date()
-        raise ValueError("Unexpected missing date or dateTime value")
+    transparency: Optional[str]
