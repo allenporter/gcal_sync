@@ -84,20 +84,24 @@ def test_event_datetime() -> None:
     assert event.summary == "Event summary"
     assert event.description is None
     assert event.location is None
-    tz = datetime.timezone(datetime.timedelta(hours=-8))
+    tzinfo = datetime.timezone(datetime.timedelta(hours=-8))
 
     assert event.start
     assert event.start.date is None
     assert event.start.date_time
-    assert event.start.date_time == datetime.datetime(2022, 4, 12, 16, 30, 0, tzinfo=tz)
+    assert event.start.date_time == datetime.datetime(
+        2022, 4, 12, 16, 30, 0, tzinfo=tzinfo
+    )
     assert event.start.timezone is None
-    assert event.start.value == datetime.datetime(2022, 4, 12, 16, 30, 0, tzinfo=tz)
+    assert event.start.value == datetime.datetime(2022, 4, 12, 16, 30, 0, tzinfo=tzinfo)
 
     assert event.end
     assert event.end.date is None
-    assert event.end.date_time == datetime.datetime(2022, 4, 12, 17, 0, 0, tzinfo=tz)
+    assert event.end.date_time == datetime.datetime(
+        2022, 4, 12, 17, 0, 0, tzinfo=tzinfo
+    )
     assert event.end.timezone is None
-    assert event.end.value == datetime.datetime(2022, 4, 12, 17, 0, 0, tzinfo=tz)
+    assert event.end.value == datetime.datetime(2022, 4, 12, 17, 0, 0, tzinfo=tzinfo)
 
 
 def test_invalid_datetime() -> None:
