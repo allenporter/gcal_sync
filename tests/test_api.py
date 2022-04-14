@@ -168,6 +168,7 @@ async def test_event_missing_summary(
     assert result.items == [
         Event(
             id="some-event-id-1",
+            summary="",
             description="Event description 1",
             start=Datetime(date=datetime.date(2022, 4, 13)),
             end=Datetime(date=datetime.date(2022, 4, 14)),
