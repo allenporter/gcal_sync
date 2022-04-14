@@ -126,3 +126,40 @@ async def test_create_event(
             "end": {"date": end_date},
         },
     )
+
+
+async def test_event_missing_summary(
+    calendar_service: GoogleCalendarService,
+    events_list_items: Callable[[list[dict[str, Any]]], None],
+) -> None:
+    """Test list calendars API."""
+
+    events_list_items(
+        [
+            {
+                "id": "some-event-id-1",
+                "description": "Event description 1",
+                "start": {
+                    "date": "2022-04-13",
+                },
+                "end": {
+                    "date": "2022-04-14",
+                },
+                "status": "confirmed",
+                "transparency": "transparent",
+            },
+        ]
+    )
+
+    result = await calendar_service.async_list_events(
+        ListEventsRequest(calendar_id="some-calendar-id")
+    )
+    assert result.items == [
+        Event(
+            id="some-event-id-1",
+            description="Event description 1",
+            start=Datetime(date=datetime.date(2022, 4, 13)),
+            end=Datetime(date=datetime.date(2022, 4, 14)),
+            transparency="transparent",
+        )
+    ]
