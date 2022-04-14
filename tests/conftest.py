@@ -85,25 +85,9 @@ def mock_events_list(
 ) -> Callable[[dict[str, Any]], None]:
     """Fixture to construct a fake event list API response."""
 
-    def _put_result(response: dict[str, Any]) -> None:
-        # pylint: disable=line-too-long
-        calendar_resource.return_value.events.return_value.list.return_value.execute.return_value = (
-            response
-        )
-
-    return _put_result
-
-
-@pytest.fixture(name="events_list_items")
-def mock_events_list_items(
-    events_list: Callable[[dict[str, Any]], None]
-) -> Callable[[list[dict[str, Any]]], None]:
-    """Fixture to construct an API response containing event items."""
-
-    def _put_items(items: list[dict[str, Any]]) -> None:
-        events_list({"items": items})
-
-    return _put_items
+    list_mock = Mock()
+    calendar_resource.return_value.events.return_value.list = list_mock
+    return list_mock
 
 
 @pytest.fixture(name="calendars_list")
