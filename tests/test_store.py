@@ -2,7 +2,7 @@
 
 import pytest
 
-from google_calendar_sync.store import CalendarStore, InMemoryCalendarStore
+from gcal_sync.store import CalendarStore, InMemoryCalendarStore
 
 
 @pytest.fixture(name="store")

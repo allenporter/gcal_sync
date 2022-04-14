@@ -11,8 +11,8 @@ import pytest
 from google.oauth2.credentials import Credentials
 from googleapiclient import discovery as google_discovery
 
-from google_calendar_sync.api import GoogleCalendarService
-from google_calendar_sync.auth import AbstractAuth
+from gcal_sync.api import GoogleCalendarService
+from gcal_sync.auth import AbstractAuth
 
 ApiResult = Callable[[dict[str, Any]], None]
 _T = TypeVar("_T")
@@ -66,7 +66,7 @@ def mock_auth(creds: Credentials) -> AbstractAuth:
 @pytest.fixture(autouse=True, name="calendar_resource")
 def mock_calendar_resource() -> YieldFixture[google_discovery.Resource]:
     """Fixture to mock out the Google discovery API."""
-    with patch("google_calendar_sync.api.google_discovery.build") as mock:
+    with patch("gcal_sync.api.google_discovery.build") as mock:
         yield mock
 
 

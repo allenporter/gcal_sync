@@ -12,5 +12,5 @@ $ pip3 install -r requirements.txt
 $ py.test
 
 # Run tests with code coverage
-$ py.test --cov-report=term-missing --cov=google_calendar_sync
+$ py.test --cov-report=term-missing --cov=gcal_sync
 ```

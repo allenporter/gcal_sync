@@ -5,8 +5,8 @@ from collections.abc import Callable
 from typing import Any
 from unittest.mock import Mock, call
 
-from google_calendar_sync.api import GoogleCalendarService, ListEventsRequest
-from google_calendar_sync.model import Calendar, Datetime, Event
+from gcal_sync.api import GoogleCalendarService, ListEventsRequest
+from gcal_sync.model import Calendar, Datetime, Event
 
 from .conftest import ApiResult
 

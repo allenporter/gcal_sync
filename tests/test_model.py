@@ -5,7 +5,7 @@ import datetime
 import pytest
 from pydantic import ValidationError
 
-from google_calendar_sync.model import Calendar, Event
+from gcal_sync.model import Calendar, Event
 
 
 def test_calendar() -> None:
