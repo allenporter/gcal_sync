@@ -23,7 +23,7 @@ def _api_time_format(date_time: datetime.datetime | None) -> str | None:
 class CalendarListResponse(BaseModel):
     """Api response containing a list of calendars."""
 
-    items: list[Calendar]
+    items: list[Calendar] = []
 
 
 class ListEventsRequest(BaseModel):
@@ -39,7 +39,7 @@ class ListEventsRequest(BaseModel):
 class ListEventsResponse(BaseModel):
     """Api response containing a list of events."""
 
-    items: list[Event] = Field(alias="items")
+    items: list[Event] = Field(default=[], alias="items")
     sync_token: Optional[str] = Field(default=None, alias="syncToken")
     page_token: Optional[str] = Field(default=None, alias="pageToken")
 

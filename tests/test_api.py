@@ -38,6 +38,17 @@ async def test_list_calendars(
     ]
 
 
+async def test_list_calendars_empty_reply(
+    calendar_service: GoogleCalendarService, calendars_list: ApiResult
+) -> None:
+    """Test list calendars API."""
+
+    calendars_list({})
+
+    result = await calendar_service.async_list_calendars()
+    assert result.items == []
+
+
 async def test_list_events(
     calendar_service: GoogleCalendarService,
     events_list_items: Callable[[list[dict[str, Any]]], None],
