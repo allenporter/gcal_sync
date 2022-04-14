@@ -4,6 +4,7 @@ coverage==6.3.2
 flake8-black==0.2.3
 flake8==4.0.1
 google-api-python-client==2.38.0
+google-auth==2.6.4
 mypy==0.930
 pre-commit==2.18.1
 pydantic==1.9.0

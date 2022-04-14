@@ -47,7 +47,7 @@ class Datetime(BaseModel):
 class Event(BaseModel):
     """A single event on a calendar."""
 
-    id: str
+    id: Optional[str] = None
     summary: str
     start: Datetime
     end: Datetime
