@@ -1,9 +1,7 @@
 """Tests for google calendar API library."""
 
 import datetime
-from collections.abc import Callable
-from typing import Any
-from unittest.mock import Mock, call
+from unittest.mock import ANY, Mock, call
 
 from gcal_sync.api import GoogleCalendarService, ListEventsRequest
 from gcal_sync.model import Calendar, Datetime, Event
@@ -51,12 +49,12 @@ async def test_list_calendars_empty_reply(
 
 async def test_list_events(
     calendar_service: GoogleCalendarService,
-    events_list_items: Callable[[list[dict[str, Any]]], None],
+    events_list: Mock,
 ) -> None:
     """Test list calendars API."""
 
-    events_list_items(
-        [
+    events_list.return_value.execute.return_value = {
+        "items": [
             {
                 "id": "some-event-id-1",
                 "summary": "Event 1",
@@ -83,10 +81,27 @@ async def test_list_events(
                 "transparency": "opaque",
             },
         ]
-    )
+    }
 
     result = await calendar_service.async_list_events(
         ListEventsRequest(calendar_id="some-calendar-id")
+    )
+    events_list.assert_called()
+    calls = events_list.mock_calls
+    assert len(calls) == 2  # API call and execute call
+    events_list.assert_has_calls(
+        [
+            call(
+                calendarId="some-calendar-id",
+                timeMin=ANY,
+                timeMax=None,
+                q=None,
+                maxResults=100,
+                pageToken=None,
+                singleEvents=True,
+                orderBy="startTime",
+            )
+        ]
     )
     assert result.items == [
         Event(
@@ -141,12 +156,12 @@ async def test_create_event(
 
 async def test_event_missing_summary(
     calendar_service: GoogleCalendarService,
-    events_list_items: Callable[[list[dict[str, Any]]], None],
+    events_list: Mock,
 ) -> None:
     """Test list calendars API."""
 
-    events_list_items(
-        [
+    events_list.return_value.execute.return_value = {
+        "items": [
             {
                 "id": "some-event-id-1",
                 "description": "Event description 1",
@@ -160,7 +175,7 @@ async def test_event_missing_summary(
                 "transparency": "transparent",
             },
         ]
-    )
+    }
 
     result = await calendar_service.async_list_events(
         ListEventsRequest(calendar_id="some-calendar-id")
@@ -168,6 +183,7 @@ async def test_event_missing_summary(
     assert result.items == [
         Event(
             id="some-event-id-1",
+            summary="",
             description="Event description 1",
             start=Datetime(date=datetime.date(2022, 4, 13)),
             end=Datetime(date=datetime.date(2022, 4, 14)),

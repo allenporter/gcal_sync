@@ -14,7 +14,7 @@ class Calendar(BaseModel):
     """Metadata associated with a calendar."""
 
     id: str
-    summary: str
+    summary: str = ""
     description: Optional[str]
     location: Optional[str]
     timezone: Optional[str]
@@ -48,7 +48,7 @@ class Event(BaseModel):
     """A single event on a calendar."""
 
     id: Optional[str] = None
-    summary: Optional[str] = None
+    summary: str = ""
     start: Datetime
     end: Datetime
     description: Optional[str]

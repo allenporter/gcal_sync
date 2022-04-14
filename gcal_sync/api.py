@@ -109,7 +109,7 @@ class GoogleCalendarService:
                 timeMin=_api_time_format(
                     request.start_time
                     if request.start_time
-                    else datetime.datetime.now()
+                    else datetime.datetime.utcnow()
                 ),
                 timeMax=_api_time_format(request.end_time),
                 q=request.search,
