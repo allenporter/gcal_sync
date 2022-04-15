@@ -1,7 +1,7 @@
 black==22.3.0
 click==8.1.2
 coverage==6.3.2
-flake8-black==0.2.3
+flake8-black==0.3.2
 flake8==4.0.1
 google-api-python-client==2.38.0
 google-auth==2.6.4
