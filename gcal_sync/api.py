@@ -113,7 +113,7 @@ class GoogleCalendarService:
 
         def _create_event() -> None:
             events = service.events()
-            body = json.loads(event.json(exclude_none=True, by_alias=True))
+            body = json.loads(event.json(exclude_unset=True, by_alias=True))
             events.insert(calendarId=calendar_id, body=body).execute()
 
         return await self._loop.run_in_executor(None, _create_event)

@@ -46,12 +46,14 @@ def test_event_with_date() -> None:
             "end": {
                 "date": "2022-04-13",
             },
+            "transparency": "transparent",
         }
     )
     assert event.id == "some-event-id"
     assert event.summary == "Event summary"
     assert event.description == "Event description"
     assert event.location == "Event location"
+    assert event.transparency == "transparent"
     assert event.start
     assert event.start.date == datetime.date(2022, 4, 12)
     assert event.start.date_time is None
@@ -211,6 +213,7 @@ def test_event_utc() -> None:
     assert event.summary == "Event summary"
     assert event.description is None
     assert event.location is None
+    assert event.transparency == "opaque"
 
     assert event.start
     assert event.start.date is None
