@@ -12,7 +12,7 @@ from googleapiclient import discovery as google_discovery
 from pydantic import BaseModel, Field, root_validator
 
 from .auth import AbstractAuth
-from .model import Calendar, Event, EVENT_FIELDS, CALENDAR_FIELDS
+from .model import Calendar, Event, EVENT_FIELDS
 
 _LOGGER = logging.getLogger(__name__)
 
