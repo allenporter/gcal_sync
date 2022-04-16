@@ -2,114 +2,131 @@
 from __future__ import annotations
 
 import asyncio
-import datetime
-from collections.abc import Callable
-from typing import Any, Generator, TypeVar
-from unittest.mock import Mock, patch
+from collections.abc import Awaitable, Callable
+from typing import Any, Generator, TypeVar, cast
+from unittest.mock import Mock
 
+import aiohttp
 import pytest
-from google.oauth2.credentials import Credentials
-from googleapiclient import discovery as google_discovery
+from aiohttp.test_utils import TestClient, TestServer
 
 from gcal_sync.api import GoogleCalendarService
 from gcal_sync.auth import AbstractAuth
 
 ApiResult = Callable[[dict[str, Any]], None]
+ApiRequest = Callable[[], list[dict[str, Any]]]
 _T = TypeVar("_T")
 YieldFixture = Generator[_T, None, None]
-
-
-@pytest.fixture(name="token_scopes")
-def mock_token_scopes() -> list[str]:
-    """Fixture for scopes used during test."""
-    return ["https://www.googleapis.com/auth/calendar"]
-
-
-@pytest.fixture(name="token_expiry")
-def mock_token_expiry() -> datetime.datetime:
-    """Expiration time for credentials used in the test."""
-    return datetime.datetime.now() + datetime.timedelta(days=7)
-
-
-@pytest.fixture(name="creds")
-def mock_creds(token_scopes: list[str], token_expiry: datetime.datetime) -> Credentials:
-    """Fixture that defines creds used in the test."""
-    return Credentials(
-        token="ACCESS_TOKEN",
-        refresh_token="REFRESH_TOKEN",
-        token_uri="http://example.com",
-        client_id="client-id",
-        client_secret="client-secret",
-        scopes=token_scopes,
-        expiry=token_expiry,
-    )
 
 
 class FakeAuth(AbstractAuth):  # pylint: disable=too-few-public-methods
     """Implementation of AbstractAuth for use in tests."""
 
-    def __init__(self, creds: Credentials):
-        """Initialize FakeAuth."""
-        self._creds = creds
-
-    async def async_get_creds(self) -> Credentials:
+    async def async_get_access_token(self) -> str:
         """Return an OAuth credential for the calendar API."""
-        return self._creds
+        return "ACCESS_TOKEN"
 
 
-@pytest.fixture(name="auth")
-def mock_auth(creds: Credentials) -> AbstractAuth:
-    """Fixture to fake out an auth implementation."""
-    return FakeAuth(creds)
+@pytest.fixture
+def event_loop() -> asyncio.AbstractEventLoop:
+    loop = asyncio.get_event_loop()
+    yield loop
 
 
-@pytest.fixture(autouse=True, name="calendar_resource")
-def mock_calendar_resource() -> YieldFixture[google_discovery.Resource]:
-    """Fixture to mock out the Google discovery API."""
-    with patch("gcal_sync.api.google_discovery.build") as mock:
-        yield mock
+@pytest.fixture
+def loop(event_loop: asyncio.AbstractEventLoop) -> asyncio.AbstractEventLoop:
+    return event_loop
 
 
-@pytest.fixture(name="calendar_service")
+async def handler(request: aiohttp.web.Request) -> aiohttp.web.Response:
+    """Handles the request, inserting response prepared by tests."""
+    if request.method == "POST":
+        try:
+            request.app["request-json"].append(await request.json())
+        except JSONDecodeError:
+            pass
+        request.app["request-post"].append(await request.post())
+    response = aiohttp.web.json_response()
+    if len(request.app["response"]) > 0:
+        response = request.app["response"].pop(0)
+    url = request.url.path
+    if request.query_string:
+        url += f"?{request.query_string}"
+    request.app["request"].append(url)
+    return cast(aiohttp.web.Response, response)
+
+
+@pytest.fixture
+async def request_handler() -> Callable[
+    [aiohttp.web.Request], Awaitable[aiohttp.web.Response]
+]:
+    return handler
+
+
+@pytest.fixture
+def app() -> aiohttp.web.Application:
+    app = aiohttp.web.Application()
+    app["response"] = []
+    app["request"] = []
+    app["request-json"] = []
+    app["request-post"] = []
+    app.router.add_get("/users/me/calendarList", handler)
+    app.router.add_get("/calendars/{calendarId}/events", handler)
+    app.router.add_post("/calendars/{calendarId}/events", handler)
+    return app
+
+
+@pytest.fixture(name="test_client")
+def cli_cb(
+    loop: Any,
+    app: aiohttp.web.Application,
+    aiohttp_client: Callable[[aiohttp.web.Application], Awaitable[TestClient]],
+) -> Callable[[], Awaitable[TestClient]]:
+    """Creates a fake aiohttp client."""
+
+    async def func() -> TestClient:
+        return await aiohttp_client(app)
+
+    return func
+
+
+@pytest.fixture(name="calendar_service_cb")
 def mock_calendar_service(
-    event_loop: asyncio.AbstractEventLoop,
-    auth: AbstractAuth,
-) -> GoogleCalendarService:
+    test_client: Callable[[], Awaitable[TestClient]]
+) -> Callable[[], Awaitable[GoogleCalendarService]]:
     """Fixture to fake out the api service."""
-    return GoogleCalendarService(event_loop, auth)
+
+    async def func() -> GoogleCalendarService:
+        client = await test_client()
+        return GoogleCalendarService(FakeAuth(client, ""))
+
+    return func
 
 
-@pytest.fixture(name="events_list")
-def mock_events_list(
-    calendar_resource: google_discovery.Resource,
-) -> Callable[[dict[str, Any]], None]:
-    """Fixture to construct a fake event list API response."""
-
-    list_mock = Mock()
-    calendar_resource.return_value.events.return_value.list = list_mock
-    return list_mock
-
-
-@pytest.fixture(name="calendars_list")
-def mock_calendars_list(
-    calendar_resource: google_discovery.Resource,
-) -> ApiResult:
-    """Fixture to construct a fake calendar list API response."""
+@pytest.fixture(name="json_response")
+def mock_json_response(app: aiohttp.web.Application) -> ApiResult:
+    """Fixture to construct a fake API response."""
 
     def _put_result(response: dict[str, Any]) -> None:
-        # pylint: disable=line-too-long
-        calendar_resource.return_value.calendarList.return_value.list.return_value.execute.return_value = (
-            response
-        )
+        app["response"].append(aiohttp.web.json_response(response))
 
     return _put_result
 
 
-@pytest.fixture(name="insert_event")
-def mock_insert_event(
-    calendar_resource: google_discovery.Resource,
-) -> Mock:
-    """Fixture to create a mock to capture new events added to the API."""
-    insert_mock = Mock()
-    calendar_resource.return_value.events.return_value.insert = insert_mock
-    return insert_mock
+@pytest.fixture(name="url_request")
+def mock_url_request(app: aiohttp.web.Application) -> Callable[[], str]:
+    """Fixture to return the requested url."""
+
+    def _get_request() -> None:
+        return app["request"]
+
+    return _get_request
+
+@pytest.fixture(name="json_request")
+def mock_json_request(app: aiohttp.web.Application) -> ApiRequest:
+    """Fixture to return the received request."""
+
+    def _get_request() -> None:
+        return app["request-json"]
+
+    return _get_request
