@@ -54,6 +54,7 @@ class DateOrDatetime(BaseModel):
         return values
 
     class Config:
+        """Model configuration."""
         allow_population_by_field_name = True
         arbitrary_types_allowed = True
 
@@ -70,4 +71,5 @@ class Event(BaseModel):
     transparency: Optional[str]
 
     class Config:
+        """Model configuration."""
         allow_population_by_field_name = True

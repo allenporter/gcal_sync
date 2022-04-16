@@ -18,6 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 EVENT_PAGE_SIZE = 100
+# pylint: disable=line-too-long
 FIELDS = "kind,items(summary,description,location,start,end,transparency),nextPageToken,nextSyncToken"
 
 
@@ -51,6 +52,7 @@ class ListEventsRequest(BaseModel):
         return values
 
     class Config:
+        """Model configuration."""
         allow_population_by_field_name = True
 
 
