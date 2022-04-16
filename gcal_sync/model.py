@@ -69,7 +69,7 @@ class Event(BaseModel):
     end: DateOrDatetime
     description: Optional[str]
     location: Optional[str]
-    transparency: Optional[str]
+    transparency: str = Field(default="opaque")
 
     class Config:
         """Model configuration."""
