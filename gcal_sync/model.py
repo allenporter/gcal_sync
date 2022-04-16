@@ -6,7 +6,7 @@ import datetime
 import zoneinfo
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, root_validator
 
 DATE_STR_FORMAT = "%Y-%m-%d"
 

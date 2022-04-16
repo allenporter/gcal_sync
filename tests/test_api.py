@@ -1,10 +1,9 @@
 """Tests for google calendar API library."""
 
 import datetime
-import zoneinfo
-from freezegun import freeze_time
-from unittest.mock import ANY, Mock, call, patch
+from unittest.mock import ANY, Mock, call
 
+from freezegun import freeze_time
 from gcal_sync.api import GoogleCalendarService, ListEventsRequest
 from gcal_sync.model import Calendar, DateOrDatetime, Event
 
@@ -317,6 +316,3 @@ async def test_list_events_page_token(
         ListEventsRequest(calendar_id="some-calendar-id")
     )
     assert result.page_token == "some-token"
-
-
-
