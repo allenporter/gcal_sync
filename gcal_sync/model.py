@@ -6,9 +6,10 @@ import datetime
 import zoneinfo
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, root_validator
 
 DATE_STR_FORMAT = "%Y-%m-%d"
+EVENT_FIELDS = "id,summary,description,location,start,end,transparency"
 
 
 class Calendar(BaseModel):
@@ -54,6 +55,7 @@ class DateOrDatetime(BaseModel):
         return values
 
     class Config:
+        """Model configuration."""
         allow_population_by_field_name = True
         arbitrary_types_allowed = True
 
@@ -70,4 +72,5 @@ class Event(BaseModel):
     transparency: Optional[str]
 
     class Config:
+        """Model configuration."""
         allow_population_by_field_name = True

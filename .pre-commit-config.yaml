@@ -42,4 +42,5 @@ repos:
       [
         "-rn", # Only display messages
         "-sn", # Don't display the score
+        "--disable=too-few-public-methods",
       ]

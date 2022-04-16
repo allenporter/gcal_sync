@@ -6,24 +6,28 @@ import asyncio
 import datetime
 import json
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from googleapiclient import discovery as google_discovery
 from pydantic import BaseModel, Field, root_validator
 
 from .auth import AbstractAuth
-from .model import Calendar, Event
+from .model import Calendar, Event, EVENT_FIELDS
 
 _LOGGER = logging.getLogger(__name__)
 
 
 EVENT_PAGE_SIZE = 100
+# pylint: disable=line-too-long
+EVENT_API_FIELDS = f"kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 
 
 class CalendarListResponse(BaseModel):
     """Api response containing a list of calendars."""
 
     items: list[Calendar] = []
+    page_token: Optional[str] = Field(default=None, alias="nextPageToken")
+    sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
 
 
 def now() -> datetime.datetime:
@@ -38,7 +42,7 @@ class ListEventsRequest(BaseModel):
     start_time: datetime.datetime = Field(default_factory=now, alias="timeMin")
     end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
     search: Optional[str] = Field(default=None, alias="q")
-    page_token: Optional[str] = None
+    page_token: Optional[str] = Field(default=None, alias="pageToken")
 
     @root_validator
     def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
@@ -50,6 +54,7 @@ class ListEventsRequest(BaseModel):
         return values
 
     class Config:
+        """Model configuration."""
         allow_population_by_field_name = True
 
 
@@ -57,8 +62,8 @@ class ListEventsResponse(BaseModel):
     """Api response containing a list of events."""
 
     items: list[Event] = Field(default=[], alias="items")
-    sync_token: Optional[str] = Field(default=None, alias="syncToken")
-    page_token: Optional[str] = Field(default=None, alias="pageToken")
+    sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
+    page_token: Optional[str] = Field(default=None, alias="nextPageToken")
 
 
 class GoogleCalendarService:
@@ -93,6 +98,7 @@ class GoogleCalendarService:
         def _list_calendars() -> CalendarListResponse:
             cal_list = service.calendarList()
             result = cal_list.list().execute()
+            _LOGGER.debug("List calendars response: %s", result)
             return CalendarListResponse.parse_obj(result)
 
         return await self._loop.run_in_executor(None, _list_calendars)
@@ -127,6 +133,7 @@ class GoogleCalendarService:
                 maxResults=EVENT_PAGE_SIZE,
                 singleEvents=True,  # Flattens recurring events
                 orderBy="startTime",
+                fields=EVENT_API_FIELDS,
             ).execute()
             _LOGGER.debug("List event response: %s", result)
             return ListEventsResponse.parse_obj(result)

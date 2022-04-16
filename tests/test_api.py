@@ -1,10 +1,9 @@
 """Tests for google calendar API library."""
 
 import datetime
-import zoneinfo
-from freezegun import freeze_time
-from unittest.mock import ANY, Mock, call, patch
+from unittest.mock import ANY, Mock, call
 
+from freezegun import freeze_time
 from gcal_sync.api import GoogleCalendarService, ListEventsRequest
 from gcal_sync.model import Calendar, DateOrDatetime, Event
 
@@ -99,6 +98,7 @@ async def test_list_events(
                 maxResults=100,
                 singleEvents=True,
                 orderBy="startTime",
+                fields=ANY,
             )
         ]
     )
@@ -152,6 +152,7 @@ async def test_list_events_with_date_limit(
                 maxResults=100,
                 singleEvents=True,
                 orderBy="startTime",
+                fields=ANY,
             )
         ]
     )
@@ -285,3 +286,33 @@ async def test_event_missing_summary(
             transparency="transparent",
         )
     ]
+
+
+async def test_list_events_page_token(
+    calendar_service: GoogleCalendarService,
+    events_list: Mock,
+) -> None:
+    """Test list calendars API."""
+
+    events_list.return_value.execute.return_value = {
+        "nextPageToken": "some-token",
+        "items": [
+            {
+                "id": "some-event-id-1",
+                "summary": "Event 1",
+                "description": "Event description 1",
+                "start": {
+                    "date": "2022-04-13",
+                },
+                "end": {
+                    "date": "2022-04-14",
+                },
+                "status": "confirmed",
+                "transparency": "transparent",
+            },
+        ]
+    }
+    result = await calendar_service.async_list_events(
+        ListEventsRequest(calendar_id="some-calendar-id")
+    )
+    assert result.page_token == "some-token"
