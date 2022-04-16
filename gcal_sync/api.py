@@ -12,20 +12,22 @@ from googleapiclient import discovery as google_discovery
 from pydantic import BaseModel, Field, root_validator
 
 from .auth import AbstractAuth
-from .model import Calendar, Event
+from .model import Calendar, Event, EVENT_FIELDS, CALENDAR_FIELDS
 
 _LOGGER = logging.getLogger(__name__)
 
 
 EVENT_PAGE_SIZE = 100
 # pylint: disable=line-too-long
-FIELDS = "kind,items(summary,description,location,start,end,transparency),nextPageToken,nextSyncToken"
+EVENT_API_FIELDS = f"kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 
 
 class CalendarListResponse(BaseModel):
     """Api response containing a list of calendars."""
 
     items: list[Calendar] = []
+    page_token: Optional[str] = Field(default=None, alias="nextPageToken")
+    sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
 
 
 def now() -> datetime.datetime:
@@ -96,6 +98,7 @@ class GoogleCalendarService:
         def _list_calendars() -> CalendarListResponse:
             cal_list = service.calendarList()
             result = cal_list.list().execute()
+            _LOGGER.debug("List calendars response: %s", result)
             return CalendarListResponse.parse_obj(result)
 
         return await self._loop.run_in_executor(None, _list_calendars)
@@ -130,7 +133,7 @@ class GoogleCalendarService:
                 maxResults=EVENT_PAGE_SIZE,
                 singleEvents=True,  # Flattens recurring events
                 orderBy="startTime",
-                fields=FIELDS,
+                fields=EVENT_API_FIELDS,
             ).execute()
             _LOGGER.debug("List event response: %s", result)
             return ListEventsResponse.parse_obj(result)

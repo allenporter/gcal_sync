@@ -9,6 +9,8 @@ from typing import Any, Optional, Union
 from pydantic import BaseModel, Field, root_validator
 
 DATE_STR_FORMAT = "%Y-%m-%d"
+EVENT_FIELDS = "id,summary,description,location,start,end,transparency"
+CALENDAR_FIELDS = "id,summary,description,location,timezone"
 
 
 class Calendar(BaseModel):
