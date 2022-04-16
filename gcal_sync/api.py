@@ -92,7 +92,9 @@ class GoogleCalendarService:
         event: Event,
     ) -> None:
         """Create an event on the specified calendar."""
-        body = event.json(exclude_unset=True, by_alias=True, exclude={"calendar_id"})
+        body = json.loads(
+            event.json(exclude_unset=True, by_alias=True, exclude={"calendar_id"})
+        )
         await self._auth.post(
             CALENDAR_EVENTS_URL.format(calendar_id=calendar_id), data=body
         )
@@ -108,7 +110,11 @@ class GoogleCalendarService:
             "orderBy": "startTime",
             "fields": EVENT_API_FIELDS,
         }
-        params.update(json.loads(request.json(exclude_none=True, by_alias=True, exclude={"calendar_id"})))
+        params.update(
+            json.loads(
+                request.json(exclude_none=True, by_alias=True, exclude={"calendar_id"})
+            )
+        )
         result = await self._auth.get_json(
             CALENDAR_EVENTS_URL.format(calendar_id=request.calendar_id), params=params
         )

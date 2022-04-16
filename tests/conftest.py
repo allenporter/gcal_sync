@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from typing import Any, Generator, TypeVar, cast
-from unittest.mock import Mock
+from json import JSONDecodeError
+from typing import Any, Generator, List, TypeVar, cast
 
 import aiohttp
 import pytest
-from aiohttp.test_utils import TestClient, TestServer
+from aiohttp.test_utils import TestClient
 
 from gcal_sync.api import GoogleCalendarService
 from gcal_sync.auth import AbstractAuth
@@ -28,14 +28,9 @@ class FakeAuth(AbstractAuth):  # pylint: disable=too-few-public-methods
 
 
 @pytest.fixture
-def event_loop() -> asyncio.AbstractEventLoop:
-    loop = asyncio.get_event_loop()
-    yield loop
-
-
-@pytest.fixture
-def loop(event_loop: asyncio.AbstractEventLoop) -> asyncio.AbstractEventLoop:
-    return event_loop
+def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
+    """Fixture for producing event loop."""
+    yield asyncio.get_event_loop()
 
 
 async def handler(request: aiohttp.web.Request) -> aiohttp.web.Response:
@@ -53,18 +48,20 @@ async def handler(request: aiohttp.web.Request) -> aiohttp.web.Response:
     if request.query_string:
         url += f"?{request.query_string}"
     request.app["request"].append(url)
-    return cast(aiohttp.web.Response, response)
+    return response
 
 
 @pytest.fixture
 async def request_handler() -> Callable[
     [aiohttp.web.Request], Awaitable[aiohttp.web.Response]
 ]:
+    """A fake request handler."""
     return handler
 
 
-@pytest.fixture
-def app() -> aiohttp.web.Application:
+@pytest.fixture(name="app")
+def mock_app() -> aiohttp.web.Application:
+    """Fixture to create the fake web app."""
     app = aiohttp.web.Application()
     app["response"] = []
     app["request"] = []
@@ -98,7 +95,7 @@ def mock_calendar_service(
 
     async def func() -> GoogleCalendarService:
         client = await test_client()
-        return GoogleCalendarService(FakeAuth(client, ""))
+        return GoogleCalendarService(FakeAuth(cast(aiohttp.ClientSession, client), ""))
 
     return func
 
@@ -114,19 +111,20 @@ def mock_json_response(app: aiohttp.web.Application) -> ApiResult:
 
 
 @pytest.fixture(name="url_request")
-def mock_url_request(app: aiohttp.web.Application) -> Callable[[], str]:
+def mock_url_request(app: aiohttp.web.Application) -> Callable[[], list[str]]:
     """Fixture to return the requested url."""
 
-    def _get_request() -> None:
-        return app["request"]
+    def _get_request() -> list[str]:
+        return cast(List[str], app["request"])
 
     return _get_request
+
 
 @pytest.fixture(name="json_request")
 def mock_json_request(app: aiohttp.web.Application) -> ApiRequest:
     """Fixture to return the received request."""
 
-    def _get_request() -> None:
-        return app["request-json"]
+    def _get_request() -> list[dict[str, Any]]:
+        return cast(List[dict[str, Any]], app["request-json"])
 
     return _get_request
