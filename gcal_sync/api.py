@@ -6,7 +6,7 @@ import asyncio
 import datetime
 import json
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from googleapiclient import discovery as google_discovery
 from pydantic import BaseModel, Field, root_validator
