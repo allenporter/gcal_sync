@@ -119,7 +119,6 @@ async def test_list_events(
             start=DateOrDatetime(date=datetime.date(2022, 4, 14)),
             end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
             transparency="opaque",
-            fields=ANY,
         ),
     ]
     assert result.page_token is None
