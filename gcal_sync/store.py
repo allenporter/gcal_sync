@@ -29,3 +29,27 @@ class InMemoryCalendarStore(CalendarStore):
     async def async_save(self, data: dict[str, Any]) -> None:
         """Save data."""
         self._data = data
+
+
+class ScopedCalendarStore(CalendarStore):
+    """A store that reads/writes to a key within the store."""
+
+    def __init__(self, store: CalendarStore, key: str) -> None:
+        """Initialize ScopedCalendarStore."""
+        self._store = store
+        self._key = key
+
+    async def async_load(self) -> dict[str, Any]:
+        """Load data from the store."""
+        store_data = await self._store.async_load()
+        if not store_data:
+            store_data = {}
+        return store_data.get(self._key, {})
+
+    async def async_save(self, data: dict[str, Any]) -> None:
+        """Save data to the store, performing a read/modify/write"""
+        store_data = await self._store.async_load()
+        if not store_data:
+            store_data = {}
+        store_data[self._key] = data
+        return await self._store.async_save(store_data)
