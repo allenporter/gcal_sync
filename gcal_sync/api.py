@@ -96,7 +96,7 @@ class GoogleCalendarService:
             event.json(exclude_unset=True, by_alias=True, exclude={"calendar_id"})
         )
         await self._auth.post(
-            CALENDAR_EVENTS_URL.format(calendar_id=calendar_id), data=body
+            CALENDAR_EVENTS_URL.format(calendar_id=calendar_id), json=body
         )
 
     async def async_list_events(

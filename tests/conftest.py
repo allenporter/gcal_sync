@@ -38,7 +38,8 @@ async def handler(request: aiohttp.web.Request) -> aiohttp.web.Response:
     if request.method == "POST":
         try:
             request.app["request-json"].append(await request.json())
-        except JSONDecodeError:
+        except JSONDecodeError as err:
+            print(err)
             pass
         request.app["request-post"].append(await request.post())
     response = aiohttp.web.json_response()
@@ -75,7 +76,7 @@ def mock_app() -> aiohttp.web.Application:
 
 @pytest.fixture(name="test_client")
 def cli_cb(
-    loop: Any,
+    event_loop: asyncio.AbstractEventLoop,
     app: aiohttp.web.Application,
     aiohttp_client: Callable[[aiohttp.web.Application], Awaitable[TestClient]],
 ) -> Callable[[], Awaitable[TestClient]]:
