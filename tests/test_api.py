@@ -99,6 +99,7 @@ async def test_list_events(
                 maxResults=100,
                 singleEvents=True,
                 orderBy="startTime",
+                fields=ANY,
             )
         ]
     )
@@ -118,6 +119,7 @@ async def test_list_events(
             start=DateOrDatetime(date=datetime.date(2022, 4, 14)),
             end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
             transparency="opaque",
+            fields=ANY,
         ),
     ]
     assert result.page_token is None
@@ -152,6 +154,7 @@ async def test_list_events_with_date_limit(
                 maxResults=100,
                 singleEvents=True,
                 orderBy="startTime",
+                fields=ANY,
             )
         ]
     )
@@ -285,3 +288,36 @@ async def test_event_missing_summary(
             transparency="transparent",
         )
     ]
+
+
+async def test_list_events_page_token(
+    calendar_service: GoogleCalendarService,
+    events_list: Mock,
+) -> None:
+    """Test list calendars API."""
+
+    events_list.return_value.execute.return_value = {
+        "nextPageToken": "some-token",
+        "items": [
+            {
+                "id": "some-event-id-1",
+                "summary": "Event 1",
+                "description": "Event description 1",
+                "start": {
+                    "date": "2022-04-13",
+                },
+                "end": {
+                    "date": "2022-04-14",
+                },
+                "status": "confirmed",
+                "transparency": "transparent",
+            },
+        ]
+    }
+    result = await calendar_service.async_list_events(
+        ListEventsRequest(calendar_id="some-calendar-id")
+    )
+    assert result.page_token == "some-token"
+
+
+

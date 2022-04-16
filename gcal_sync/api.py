@@ -18,6 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 EVENT_PAGE_SIZE = 100
+FIELDS = "kind,items(summary,description,location,start,end,transparency),nextPageToken,nextSyncToken"
 
 
 class CalendarListResponse(BaseModel):
@@ -38,7 +39,7 @@ class ListEventsRequest(BaseModel):
     start_time: datetime.datetime = Field(default_factory=now, alias="timeMin")
     end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
     search: Optional[str] = Field(default=None, alias="q")
-    page_token: Optional[str] = None
+    page_token: Optional[str] = Field(default=None, alias="pageToken")
 
     @root_validator
     def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
@@ -57,8 +58,8 @@ class ListEventsResponse(BaseModel):
     """Api response containing a list of events."""
 
     items: list[Event] = Field(default=[], alias="items")
-    sync_token: Optional[str] = Field(default=None, alias="syncToken")
-    page_token: Optional[str] = Field(default=None, alias="pageToken")
+    sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
+    page_token: Optional[str] = Field(default=None, alias="nextPageToken")
 
 
 class GoogleCalendarService:
@@ -127,6 +128,7 @@ class GoogleCalendarService:
                 maxResults=EVENT_PAGE_SIZE,
                 singleEvents=True,  # Flattens recurring events
                 orderBy="startTime",
+                fields=FIELDS,
             ).execute()
             _LOGGER.debug("List event response: %s", result)
             return ListEventsResponse.parse_obj(result)
