@@ -1,5 +1,9 @@
 # gcal-sync
-A python library for syncing Google Calendar to local storage for use in Home Assistant
+
+An asyncio python library for Google Calendar. This library provides a simplified Google Calendar API
+that is lighter weight and more streamlined compared to using aiogoogle, and increased reliability by
+supporting efficient sync and reading from local storage.
+
 
 ## Development Environment
 
