@@ -1,10 +1,12 @@
 """Tests for google calendar API library."""
 
 import datetime
-from unittest.mock import ANY, Mock, call
+import zoneinfo
+from freezegun import freeze_time
+from unittest.mock import ANY, Mock, call, patch
 
 from gcal_sync.api import GoogleCalendarService, ListEventsRequest
-from gcal_sync.model import Calendar, Datetime, Event
+from gcal_sync.model import Calendar, DateOrDatetime, Event
 
 from .conftest import ApiResult
 
@@ -47,6 +49,7 @@ async def test_list_calendars_empty_reply(
     assert result.items == []
 
 
+@freeze_time("2022-04-30 07:31:02", tz_offset=-6)
 async def test_list_events(
     calendar_service: GoogleCalendarService,
     events_list: Mock,
@@ -82,7 +85,6 @@ async def test_list_events(
             },
         ]
     }
-
     result = await calendar_service.async_list_events(
         ListEventsRequest(calendar_id="some-calendar-id")
     )
@@ -93,11 +95,8 @@ async def test_list_events(
         [
             call(
                 calendarId="some-calendar-id",
-                timeMin=ANY,
-                timeMax=None,
-                q=None,
+                timeMin="2022-04-30T01:31:02+00:00",
                 maxResults=100,
-                pageToken=None,
                 singleEvents=True,
                 orderBy="startTime",
             )
@@ -108,16 +107,16 @@ async def test_list_events(
             id="some-event-id-1",
             summary="Event 1",
             description="Event description 1",
-            start=Datetime(date=datetime.date(2022, 4, 13)),
-            end=Datetime(date=datetime.date(2022, 4, 14)),
+            start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
             transparency="transparent",
         ),
         Event(
             id="some-event-id-2",
             summary="Event 2",
             description="Event description 2",
-            start=Datetime(date=datetime.date(2022, 4, 14)),
-            end=Datetime(date=datetime.date(2022, 4, 20)),
+            start=DateOrDatetime(date=datetime.date(2022, 4, 14)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
             transparency="opaque",
         ),
     ]
@@ -125,20 +124,52 @@ async def test_list_events(
     assert result.sync_token is None
 
 
-async def test_create_event(
+async def test_list_events_with_date_limit(
+    calendar_service: GoogleCalendarService,
+    events_list: Mock,
+) -> None:
+    """Test list calendars API with start/end datetimes."""
+
+    # Test doesn't care about response
+    events_list.return_value.execute.return_value = {"items": []}
+
+    tzinfo = datetime.timezone(datetime.timedelta(hours=-6), "America/Regina")
+    start = datetime.datetime(2022, 4, 13, 7, 30, 12, 345678, tzinfo)
+    end = datetime.datetime(2022, 4, 13, 9, 30, 12, 345678, tzinfo)
+
+    await calendar_service.async_list_events(
+        ListEventsRequest(calendar_id="some-calendar-id", start_time=start, end_time=end),
+    )
+    events_list.assert_called()
+    calls = events_list.mock_calls
+    assert len(calls) == 2  # API call and execute call
+    events_list.assert_has_calls(
+        [
+            call(
+                calendarId="some-calendar-id",
+                timeMin="2022-04-13T07:30:12-06:00",
+                timeMax="2022-04-13T09:30:12-06:00",
+                maxResults=100,
+                singleEvents=True,
+                orderBy="startTime",
+            )
+        ]
+    )
+
+
+async def test_create_event_with_date(
     calendar_service: GoogleCalendarService, insert_event: Mock
 ) -> None:
     """Test create event API."""
 
-    today = datetime.date.today()
-    start_date = today + datetime.timedelta(days=1)
-    end_date = today + datetime.timedelta(days=2)
+    start_date = datetime.date(2022, 4, 15)
+    end_date = start_date + datetime.timedelta(days=2)
 
     event = Event(
         summary="Summary",
         description="Description",
-        start=Datetime(date=start_date),
-        end=Datetime(date=end_date),
+        start=DateOrDatetime(date=start_date),
+        end=DateOrDatetime(date=end_date),
     )
 
     await calendar_service.async_create_event("calendar-id", event)
@@ -148,8 +179,72 @@ async def test_create_event(
         body={
             "summary": "Summary",
             "description": "Description",
-            "start": {"date": start_date},
-            "end": {"date": end_date},
+            "start": {"date": "2022-04-15"},
+            "end": {"date": "2022-04-17"},
+        },
+    )
+
+
+async def test_create_event_with_datetime(
+    calendar_service: GoogleCalendarService, insert_event: Mock
+) -> None:
+    """Test create event API with date times."""
+
+    start = datetime.datetime(2022, 4, 15, 7, 30, 12, 12345)
+    end = start + datetime.timedelta(hours=2)
+
+    event = Event(
+        summary="Summary",
+        description="Description",
+        start=DateOrDatetime(date_time=start),
+        end=DateOrDatetime(date_time=end),
+    )
+
+    await calendar_service.async_create_event("calendar-id", event)
+    insert_event.assert_called()
+    assert insert_event.mock_calls[0] == call(
+        calendarId="calendar-id",
+        body={
+            "summary": "Summary",
+            "description": "Description",
+            # micros are stripped
+            "start": {"dateTime": "2022-04-15T07:30:12"},
+            "end": {"dateTime": "2022-04-15T09:30:12"},
+        },
+    )
+
+
+async def test_create_event_with_timezone(
+    calendar_service: GoogleCalendarService, insert_event: Mock
+) -> None:
+    """Test create event API with date times."""
+
+    start = datetime.datetime(
+        2022,
+        4,
+        15,
+        7,
+        30,
+        tzinfo=datetime.timezone(datetime.timedelta(hours=-6), "America/Regina"),
+    )
+    end = start + datetime.timedelta(hours=2)
+
+    event = Event(
+        summary="Summary",
+        description="Description",
+        start=DateOrDatetime(date_time=start),
+        end=DateOrDatetime(date_time=end),
+    )
+
+    await calendar_service.async_create_event("calendar-id", event)
+    insert_event.assert_called()
+    assert insert_event.mock_calls[0] == call(
+        calendarId="calendar-id",
+        body={
+            "summary": "Summary",
+            "description": "Description",
+            "start": {"dateTime": "2022-04-15T07:30:00-06:00"},
+            "end": {"dateTime": "2022-04-15T09:30:00-06:00"},
         },
     )
 
@@ -185,8 +280,8 @@ async def test_event_missing_summary(
             id="some-event-id-1",
             summary="",
             description="Event description 1",
-            start=Datetime(date=datetime.date(2022, 4, 13)),
-            end=Datetime(date=datetime.date(2022, 4, 14)),
+            start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
             transparency="transparent",
         )
     ]

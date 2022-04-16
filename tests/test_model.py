@@ -1,6 +1,7 @@
 """Tests for the data model."""
 
 import datetime
+import json
 
 import pytest
 from pydantic import ValidationError
@@ -140,3 +141,95 @@ def test_invalid_datetime() -> None:
                 "start": {"date": "invalid-datetime"},
             }
         )
+
+
+def test_event_timezone() -> None:
+    """Exercise a datetime with a time zone."""
+
+    event = Event.parse_obj(
+        {
+            "kind": "calendar#event",
+            "id": "some-event-id",
+            "status": "some-status",
+            "summary": "Event summary",
+            "start": {
+                "dateTime": "2022-04-12T16:30:00",
+                "timeZone": "America/Regina",
+            },
+            "end": {
+                "dateTime": "2022-04-12T17:00:00",
+                "timeZone": "America/Regina",
+            },
+        }
+    )
+    assert event.id == "some-event-id"
+    assert event.summary == "Event summary"
+    assert event.description is None
+    assert event.location is None
+
+    tzinfo = datetime.timezone(datetime.timedelta(hours=-6))
+
+    assert event.start
+    assert event.start.date is None
+    assert event.start.date_time
+    assert event.start.date_time == datetime.datetime(2022, 4, 12, 16, 30, 0)
+    assert event.start.timezone == "America/Regina"
+    assert event.start.value == datetime.datetime(2022, 4, 12, 16, 30, 0, tzinfo=tzinfo)
+
+    assert event.end
+    assert event.end.date is None
+    assert event.end.date_time == datetime.datetime(2022, 4, 12, 17, 0, 0)
+    assert event.end.timezone == "America/Regina"
+    assert event.end.value == datetime.datetime(2022, 4, 12, 17, 0, 0, tzinfo=tzinfo)
+
+    assert json.loads(event.json(exclude_unset=True, by_alias=True)) == {
+        "id": "some-event-id",
+        "summary": "Event summary",
+        "start": {"dateTime": "2022-04-12T16:30:00", "timeZone": "America/Regina"},
+        "end": {"dateTime": "2022-04-12T17:00:00", "timeZone": "America/Regina"},
+    }
+
+
+def test_event_utc() -> None:
+    """Exercise a datetime in UTC"""
+
+    event = Event.parse_obj(
+        {
+            "kind": "calendar#event",
+            "id": "some-event-id",
+            "status": "some-status",
+            "summary": "Event summary",
+            "start": {
+                "dateTime": "2022-04-12T16:30:00Z",
+            },
+            "end": {
+                "dateTime": "2022-04-12T17:00:00Z",
+            },
+        }
+    )
+    assert event.id == "some-event-id"
+    assert event.summary == "Event summary"
+    assert event.description is None
+    assert event.location is None
+
+    assert event.start
+    assert event.start.date is None
+    assert event.start.date_time
+    assert event.start.date_time == datetime.datetime(
+        2022, 4, 12, 16, 30, 0, tzinfo=datetime.timezone.utc
+    )
+    assert event.start.timezone is None
+    assert event.start.value == datetime.datetime(
+        2022, 4, 12, 16, 30, 0, tzinfo=datetime.timezone.utc
+    )
+
+    assert event.end
+    assert event.end.date is None
+    assert event.end.date_time == datetime.datetime(
+        2022, 4, 12, 17, 0, 0, tzinfo=datetime.timezone.utc
+    )
+    assert event.start.timezone is None
+    assert event.end.timezone is None
+    assert event.end.value == datetime.datetime(
+        2022, 4, 12, 17, 0, 0, tzinfo=datetime.timezone.utc
+    )

@@ -4,20 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import json
+import logging
 from typing import Optional
 
 from googleapiclient import discovery as google_discovery
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, root_validator
 
 from .auth import AbstractAuth
 from .model import Calendar, Event
 
+_LOGGER = logging.getLogger(__name__)
+
+
 EVENT_PAGE_SIZE = 100
-
-
-def _api_time_format(date_time: datetime.datetime | None) -> str | None:
-    """Convert a datetime to the api string format."""
-    return date_time.isoformat("T") if date_time else None
 
 
 class CalendarListResponse(BaseModel):
@@ -26,14 +26,31 @@ class CalendarListResponse(BaseModel):
     items: list[Calendar] = []
 
 
+def now() -> datetime.datetime:
+    """Helper method to facilitate mocking in tests."""
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
 class ListEventsRequest(BaseModel):
     """Api request to list events."""
 
-    calendar_id: str
-    start_time: Optional[datetime.datetime] = None
-    end_time: Optional[datetime.datetime] = None
-    search: Optional[str] = None
+    calendar_id: str = Field(alias="calendarId")
+    start_time: datetime.datetime = Field(default_factory=now, alias="timeMin")
+    end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
+    search: Optional[str] = Field(default=None, alias="q")
     page_token: Optional[str] = None
+
+    @root_validator
+    def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Validate the date or datetime fields are set properly."""
+        if start_time := values.get("start_time"):
+            values["start_time"] = start_time.replace(microsecond=0)
+        if end_time := values.get("end_time"):
+            values["end_time"] = end_time.replace(microsecond=0)
+        return values
+
+    class Config:
+        allow_population_by_field_name = True
 
 
 class ListEventsResponse(BaseModel):
@@ -90,7 +107,7 @@ class GoogleCalendarService:
 
         def _create_event() -> None:
             events = service.events()
-            body = event.dict(exclude_unset=True)
+            body = json.loads(event.json(exclude_none=True, by_alias=True))
             events.insert(calendarId=calendar_id, body=body).execute()
 
         return await self._loop.run_in_executor(None, _create_event)
@@ -101,23 +118,17 @@ class GoogleCalendarService:
     ) -> ListEventsResponse:
         """Return the list of events."""
         service = await self._async_get_service()
+        params = json.loads(request.json(exclude_none=True, by_alias=True))
 
         def _list_events() -> ListEventsResponse:
             events = service.events()
             result = events.list(
-                calendarId=request.calendar_id,
-                timeMin=_api_time_format(
-                    request.start_time
-                    if request.start_time
-                    else datetime.datetime.utcnow()
-                ),
-                timeMax=_api_time_format(request.end_time),
-                q=request.search,
+                **params,
                 maxResults=EVENT_PAGE_SIZE,
-                pageToken=request.page_token,
                 singleEvents=True,  # Flattens recurring events
                 orderBy="startTime",
             ).execute()
+            _LOGGER.debug("List event response: %s", result)
             return ListEventsResponse.parse_obj(result)
 
         return await self._loop.run_in_executor(None, _list_events)
