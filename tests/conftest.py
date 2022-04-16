@@ -27,8 +27,8 @@ class FakeAuth(AbstractAuth):  # pylint: disable=too-few-public-methods
         return "ACCESS_TOKEN"
 
 
-@pytest.fixture
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
+@pytest.fixture(name="event_loop")
+def create_event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     """Fixture for producing event loop."""
     yield asyncio.get_event_loop()
 
@@ -40,7 +40,6 @@ async def handler(request: aiohttp.web.Request) -> aiohttp.web.Response:
             request.app["request-json"].append(await request.json())
         except JSONDecodeError as err:
             print(err)
-            pass
         request.app["request-post"].append(await request.post())
     response = aiohttp.web.json_response()
     if len(request.app["response"]) > 0:
