@@ -19,14 +19,16 @@ ERROR = "error"
 STATUS = "status"
 MESSAGE = "message"
 
+API_BASE_URL = "https://www.googleapis.com/calendar/v3"
+
 
 class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
     """Library for providing authentication credentials."""
 
-    def __init__(self, websession: aiohttp.ClientSession, host: str):
+    def __init__(self, websession: aiohttp.ClientSession, host: str | None = None):
         """Initialize the auth."""
         self._websession = websession
-        self._host = host
+        self._host = host if host else API_BASE_URL
 
     @abstractmethod
     async def async_get_access_token(self) -> str:
