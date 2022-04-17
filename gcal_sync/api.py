@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-import asyncio
 import datetime
 import json
 import logging
 from typing import Any, Optional
 
-from googleapiclient import discovery as google_discovery
 from pydantic import BaseModel, Field, root_validator
 
 from .auth import AbstractAuth
-from .model import Calendar, Event, EVENT_FIELDS
+from .model import EVENT_FIELDS, Calendar, Event
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,6 +18,10 @@ _LOGGER = logging.getLogger(__name__)
 EVENT_PAGE_SIZE = 100
 # pylint: disable=line-too-long
 EVENT_API_FIELDS = f"kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+
+API_BASE_URL = "https://www.googleapis.com/calendar/v3"
+CALENDAR_LIST_URL = "users/me/calendarList"
+CALENDAR_EVENTS_URL = "calendars/{calendar_id}/events"
 
 
 class CalendarListResponse(BaseModel):
@@ -55,6 +57,7 @@ class ListEventsRequest(BaseModel):
 
     class Config:
         """Model configuration."""
+
         allow_population_by_field_name = True
 
 
@@ -71,37 +74,17 @@ class GoogleCalendarService:
 
     def __init__(
         self,
-        loop: asyncio.AbstractEventLoop,
         auth: AbstractAuth,
     ) -> None:
         """Init the Google Calendar service."""
-        self._loop = loop
         self._auth = auth
-
-    async def _async_get_service(self) -> google_discovery.Resource:
-        """Get the calendar service with valid credetnails."""
-        creds = await self._auth.async_get_creds()
-
-        def _build() -> google_discovery.Resource:
-            return google_discovery.build(
-                "calendar", "v3", credentials=creds, cache_discovery=False
-            )
-
-        return await self._loop.run_in_executor(None, _build)
 
     async def async_list_calendars(
         self,
     ) -> CalendarListResponse:
         """Return the list of calendars the user has added to their list."""
-        service = await self._async_get_service()
-
-        def _list_calendars() -> CalendarListResponse:
-            cal_list = service.calendarList()
-            result = cal_list.list().execute()
-            _LOGGER.debug("List calendars response: %s", result)
-            return CalendarListResponse.parse_obj(result)
-
-        return await self._loop.run_in_executor(None, _list_calendars)
+        result = await self._auth.get_json(CALENDAR_LIST_URL)
+        return CalendarListResponse.parse_obj(result)
 
     async def async_create_event(
         self,
@@ -109,33 +92,30 @@ class GoogleCalendarService:
         event: Event,
     ) -> None:
         """Create an event on the specified calendar."""
-        service = await self._async_get_service()
-
-        def _create_event() -> None:
-            events = service.events()
-            body = json.loads(event.json(exclude_unset=True, by_alias=True))
-            events.insert(calendarId=calendar_id, body=body).execute()
-
-        return await self._loop.run_in_executor(None, _create_event)
+        body = json.loads(
+            event.json(exclude_unset=True, by_alias=True, exclude={"calendar_id"})
+        )
+        await self._auth.post(
+            CALENDAR_EVENTS_URL.format(calendar_id=calendar_id), json=body
+        )
 
     async def async_list_events(
         self,
         request: ListEventsRequest,
     ) -> ListEventsResponse:
         """Return the list of events."""
-        service = await self._async_get_service()
-        params = json.loads(request.json(exclude_none=True, by_alias=True))
-
-        def _list_events() -> ListEventsResponse:
-            events = service.events()
-            result = events.list(
-                **params,
-                maxResults=EVENT_PAGE_SIZE,
-                singleEvents=True,  # Flattens recurring events
-                orderBy="startTime",
-                fields=EVENT_API_FIELDS,
-            ).execute()
-            _LOGGER.debug("List event response: %s", result)
-            return ListEventsResponse.parse_obj(result)
-
-        return await self._loop.run_in_executor(None, _list_events)
+        params = {
+            "maxResult": EVENT_PAGE_SIZE,
+            "singleEvents": "true",
+            "orderBy": "startTime",
+            "fields": EVENT_API_FIELDS,
+        }
+        params.update(
+            json.loads(
+                request.json(exclude_none=True, by_alias=True, exclude={"calendar_id"})
+            )
+        )
+        result = await self._auth.get_json(
+            CALENDAR_EVENTS_URL.format(calendar_id=request.calendar_id), params=params
+        )
+        return ListEventsResponse.parse_obj(result)
