@@ -24,7 +24,21 @@ class FakeAuth(AbstractAuth):  # pylint: disable=too-few-public-methods
 
     async def async_get_access_token(self) -> str:
         """Return an OAuth credential for the calendar API."""
-        return "ACCESS_TOKEN"
+        return "some-token"
+
+
+class RefreshingAuth(AbstractAuth):
+    """Implementaiton of AbstractAuth for sending RPCs."""
+
+    def __init__(self, test_client: TestClient) -> None:
+        super().__init__(cast(aiohttp.ClientSession, test_client), "")
+
+    async def async_get_access_token(self) -> str:
+        resp = await self._websession.request("get", "/refresh-auth")
+        resp.raise_for_status()
+        json = await resp.json()
+        assert isinstance(json["token"], str)
+        return json["token"]
 
 
 @pytest.fixture(name="event_loop")
@@ -87,15 +101,40 @@ def cli_cb(
     return func
 
 
+@pytest.fixture(name="auth_client")
+def mock_auth_client(
+    test_client: Callable[[], Awaitable[TestClient]]
+) -> Callable[[str], Awaitable[FakeAuth]]:
+    """Fixture to fake out the auth library."""
+
+    async def func(host: str) -> FakeAuth:
+        client = await test_client()
+        return FakeAuth(cast(aiohttp.ClientSession, client), host)
+
+    return func
+
+
+@pytest.fixture(name="refreshing_auth_client")
+async def mock_refreshing_auth_client(
+    test_client: Callable[[], Awaitable[TestClient]],
+) -> Callable[[], Awaitable[AbstractAuth]]:
+    """Fixture to run an auth client that sends rpcs."""
+
+    async def _make_auth() -> AbstractAuth:
+        return RefreshingAuth(await test_client())
+
+    return _make_auth
+
+
 @pytest.fixture(name="calendar_service_cb")
 def mock_calendar_service(
-    test_client: Callable[[], Awaitable[TestClient]]
+    auth_client: Callable[[str], Awaitable[FakeAuth]]
 ) -> Callable[[], Awaitable[GoogleCalendarService]]:
     """Fixture to fake out the api service."""
 
     async def func() -> GoogleCalendarService:
-        client = await test_client()
-        return GoogleCalendarService(FakeAuth(cast(aiohttp.ClientSession, client), ""))
+        auth = await auth_client("")
+        return GoogleCalendarService(auth)
 
     return func
 
