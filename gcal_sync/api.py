@@ -19,7 +19,6 @@ EVENT_PAGE_SIZE = 100
 # pylint: disable=line-too-long
 EVENT_API_FIELDS = f"kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 
-API_BASE_URL = "https://www.googleapis.com/calendar/v3"
 CALENDAR_LIST_URL = "users/me/calendarList"
 CALENDAR_EVENTS_URL = "calendars/{calendar_id}/events"
 
