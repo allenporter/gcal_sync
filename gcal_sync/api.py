@@ -5,9 +5,10 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, PrivateAttr, root_validator
 
 from .auth import AbstractAuth
 from .model import EVENT_FIELDS, Calendar, Event
@@ -66,6 +67,25 @@ class ListEventsResponse(BaseModel):
     items: list[Event] = Field(default=[], alias="items")
     sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
     page_token: Optional[str] = Field(default=None, alias="nextPageToken")
+    _get_next_page: Optional[
+        Callable[[Optional[str]], Awaitable[dict[str, Any]]]
+    ] = PrivateAttr()
+
+    async def __aiter__(self) -> AsyncIterator[ListEventsResponse]:
+        """Async iterator to traverse through pages of responses."""
+        response = self
+        while response is not None:
+            yield response
+            if not response.page_token or not self._get_next_page:
+                break
+            json_result = await self._get_next_page(response.page_token)
+            response = ListEventsResponse.parse_obj(json_result)
+
+    def allow_iter(
+        self, get_next_page: Callable[[Optional[str]], Awaitable[dict[str, Any]]]
+    ) -> None:
+        """Initialize the iterator allowing async paging."""
+        self._get_next_page = get_next_page
 
 
 class GoogleCalendarService:
@@ -114,7 +134,17 @@ class GoogleCalendarService:
                 request.json(exclude_none=True, by_alias=True, exclude={"calendar_id"})
             )
         )
-        result = await self._auth.get_json(
-            CALENDAR_EVENTS_URL.format(calendar_id=request.calendar_id), params=params
-        )
-        return ListEventsResponse.parse_obj(result)
+
+        async def get_next_page(page_token: str | None) -> dict[str, Any]:
+            if page_token is not None:
+                params["pageToken"] = page_token
+            return await self._auth.get_json(
+                CALENDAR_EVENTS_URL.format(calendar_id=request.calendar_id),
+                params=params,
+            )
+
+        json_result = await get_next_page(None)
+        json_result["_get_next_page"] = get_next_page
+        result = ListEventsResponse.parse_obj(json_result)
+        result.allow_iter(get_next_page)
+        return result
