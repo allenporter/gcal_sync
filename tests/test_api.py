@@ -121,6 +121,11 @@ async def test_list_events(
     assert result.page_token is None
     assert result.sync_token is None
 
+    items = []
+    async for result_page in result:
+        items.extend(result_page.items)
+    assert len(items) == 2
+
 
 async def test_list_events_with_date_limit(
     calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
@@ -313,3 +318,104 @@ async def test_list_events_page_token(
         ListEventsRequest(calendar_id="some-calendar-id")
     )
     assert result.page_token == "some-token"
+
+
+@freeze_time("2022-04-30 07:31:02", tz_offset=-6)
+async def test_list_events_multiple_pages_with_iterator(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test list calendars API."""
+
+    json_response(
+        {
+            "nextPageToken": "page-token-1",
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "summary": "Event 1",
+                    "description": "Event description 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                    "transparency": "transparent",
+                },
+            ],
+        }
+    )
+    json_response(
+        {
+            "nextPageToken": "page-token-2",
+            "items": [
+                {
+                    "id": "some-event-id-2",
+                    "summary": "Event 2",
+                    "description": "Event description 2",
+                    "start": {
+                        "date": "2022-04-14",
+                    },
+                    "end": {
+                        "date": "2022-04-20",
+                    },
+                    "transparency": "opaque",
+                },
+            ],
+        }
+    )
+    json_response(
+        {
+            "items": [],
+        }
+    )
+    calendar_service = await calendar_service_cb()
+    result = await calendar_service.async_list_events(
+        ListEventsRequest(calendar_id="some-calendar-id")
+    )
+    # Before iterating, page token is present
+    assert result.page_token is not None
+
+    # Consume all items
+    items = []
+    page_tokens = []
+    async for result_page in result:
+        items.extend(result_page.items)
+        page_tokens.append(result_page.page_token)
+
+    assert url_request() == [
+        # Request #1
+        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
+        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
+        ",end,transparency)&timeMin=2022-04-30T01:31:02%2B00:00",
+        # Request #2
+        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
+        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
+        ",end,transparency)&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-1",
+        # Request #3
+        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
+        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
+        ",end,transparency)&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-2",
+    ]
+    assert items == [
+        Event(
+            id="some-event-id-1",
+            summary="Event 1",
+            description="Event description 1",
+            start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
+            transparency="transparent",
+        ),
+        Event(
+            id="some-event-id-2",
+            summary="Event 2",
+            description="Event description 2",
+            start=DateOrDatetime(date=datetime.date(2022, 4, 14)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
+            transparency="opaque",
+        ),
+    ]
+    assert page_tokens == ["page-token-1", "page-token-2", None]
