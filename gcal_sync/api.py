@@ -8,7 +8,7 @@ import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, PrivateAttr, root_validator
+from pydantic import BaseModel, Field, root_validator
 
 from .auth import AbstractAuth
 from .model import EVENT_FIELDS, Calendar, Event
@@ -61,15 +61,41 @@ class ListEventsRequest(BaseModel):
         allow_population_by_field_name = True
 
 
-class ListEventsResponse(BaseModel):
+class _ListEventsResponseModel(BaseModel):
     """Api response containing a list of events."""
 
     items: List[Event] = Field(default=[], alias="items")
     sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
     page_token: Optional[str] = Field(default=None, alias="nextPageToken")
-    _get_next_page: Optional[
-        Callable[[Optional[str]], Awaitable[Dict[str, Any]]]
-    ] = PrivateAttr()
+
+
+class ListEventsResponse:
+    """Api response containing a list of events."""
+
+    def __init__(
+        self,
+        model: _ListEventsResponseModel,
+        get_next_page: Callable[[Optional[str]], Awaitable[Dict[str, Any]]]
+        | None = None,
+    ) -> None:
+        """initialize ListEventsResponse."""
+        self._model = model
+        self._get_next_page = get_next_page
+
+    @property
+    def items(self) -> list[Event]:
+        """Return the calendar event items in the response."""
+        return self._model.items
+
+    @property
+    def sync_token(self) -> str | None:
+        """Return the sync token in the response."""
+        return self._model.sync_token
+
+    @property
+    def page_token(self) -> str | None:
+        """Return the page token in the response."""
+        return self._model.page_token
 
     async def __aiter__(self) -> AsyncIterator[ListEventsResponse]:
         """Async iterator to traverse through pages of responses."""
@@ -79,13 +105,9 @@ class ListEventsResponse(BaseModel):
             if not response.page_token or not self._get_next_page:
                 break
             json_result = await self._get_next_page(response.page_token)
-            response = ListEventsResponse.parse_obj(json_result)
-
-    def allow_iter(
-        self, get_next_page: Callable[[Optional[str]], Awaitable[dict[str, Any]]]
-    ) -> None:
-        """Initialize the iterator allowing async paging."""
-        self._get_next_page = get_next_page
+            response = ListEventsResponse(
+                _ListEventsResponseModel.parse_obj(json_result)
+            )
 
 
 class GoogleCalendarService:
@@ -144,7 +166,7 @@ class GoogleCalendarService:
             )
 
         json_result = await get_next_page(None)
-        json_result["_get_next_page"] = get_next_page
-        result = ListEventsResponse.parse_obj(json_result)
-        result.allow_iter(get_next_page)
+        result = ListEventsResponse(
+            _ListEventsResponseModel.parse_obj(json_result), get_next_page
+        )
         return result
