@@ -109,12 +109,6 @@ class ListEventsResponse:
                 _ListEventsResponseModel.parse_obj(json_result)
             )
 
-    def allow_iter(
-        self, get_next_page: Callable[[Optional[str]], Awaitable[dict[str, Any]]]
-    ) -> None:
-        """Initialize the iterator allowing async paging."""
-        self._get_next_page = get_next_page
-
 
 class GoogleCalendarService:
     """Calendar service interface to Google."""
