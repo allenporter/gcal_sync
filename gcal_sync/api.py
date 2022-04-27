@@ -6,7 +6,7 @@ import datetime
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, PrivateAttr, root_validator
 
@@ -27,7 +27,7 @@ CALENDAR_EVENTS_URL = "calendars/{calendar_id}/events"
 class CalendarListResponse(BaseModel):
     """Api response containing a list of calendars."""
 
-    items: list[Calendar] = []
+    items: List[Calendar] = []
     page_token: Optional[str] = Field(default=None, alias="nextPageToken")
     sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
 
@@ -64,11 +64,11 @@ class ListEventsRequest(BaseModel):
 class ListEventsResponse(BaseModel):
     """Api response containing a list of events."""
 
-    items: list[Event] = Field(default=[], alias="items")
+    items: List[Event] = Field(default=[], alias="items")
     sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
     page_token: Optional[str] = Field(default=None, alias="nextPageToken")
     _get_next_page: Optional[
-        Callable[[Optional[str]], Awaitable[dict[str, Any]]]
+        Callable[[Optional[str]], Awaitable[Dict[str, Any]]]
     ] = PrivateAttr()
 
     async def __aiter__(self) -> AsyncIterator[ListEventsResponse]:
