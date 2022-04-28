@@ -7,6 +7,7 @@ import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, Dict, List, Optional
+from urllib.request import pathname2url
 
 from pydantic import BaseModel, Field, root_validator
 
@@ -137,7 +138,7 @@ class GoogleCalendarService:
             event.json(exclude_unset=True, by_alias=True, exclude={"calendar_id"})
         )
         await self._auth.post(
-            CALENDAR_EVENTS_URL.format(calendar_id=calendar_id), json=body
+            CALENDAR_EVENTS_URL.format(calendar_id=pathname2url(calendar_id)), json=body
         )
 
     async def async_list_events(
@@ -161,7 +162,9 @@ class GoogleCalendarService:
             if page_token is not None:
                 params["pageToken"] = page_token
             return await self._auth.get_json(
-                CALENDAR_EVENTS_URL.format(calendar_id=request.calendar_id),
+                CALENDAR_EVENTS_URL.format(
+                    calendar_id=pathname2url(request.calendar_id)
+                ),
                 params=params,
             )
 

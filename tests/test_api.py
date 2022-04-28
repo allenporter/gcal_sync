@@ -419,3 +419,26 @@ async def test_list_events_multiple_pages_with_iterator(
         ),
     ]
     assert page_tokens == ["page-token-1", "page-token-2", None]
+
+
+@freeze_time("2022-04-30 07:31:02", tz_offset=-6)
+async def test_list_event_url_encoding(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test list calendars API."""
+
+    # Response is not interesting for this test, just url
+    json_response({"items": []})
+
+    calendar_service = await calendar_service_cb()
+    await calendar_service.async_list_events(
+        ListEventsRequest(calendar_id="en.usa#holiday@group.v.calendar.google.com")
+    )
+    assert url_request() == [
+        "/calendars/en.usa#holiday@group.v.calendar.google.com/events?maxResult=100"
+        "&singleEvents=true&orderBy=startTime"
+        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
+        ",end,transparency)&timeMin=2022-04-30T01:31:02%2B00:00"
+    ]
