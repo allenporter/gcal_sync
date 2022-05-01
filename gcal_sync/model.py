@@ -36,7 +36,7 @@ class DateOrDatetime(BaseModel):
         if self.date is not None:
             return self.date
         if self.date_time is not None:
-            if self.timezone is not None:
+            if self.date_time.tzinfo is None and self.timezone is not None:
                 return self.date_time.replace(tzinfo=zoneinfo.ZoneInfo(self.timezone))
             return self.date_time
         raise ValueError("Datetime has invalid state with no date or date_time")
@@ -56,6 +56,7 @@ class DateOrDatetime(BaseModel):
 
     class Config:
         """Model configuration."""
+
         allow_population_by_field_name = True
         arbitrary_types_allowed = True
 
@@ -73,4 +74,5 @@ class Event(BaseModel):
 
     class Config:
         """Model configuration."""
+
         allow_population_by_field_name = True

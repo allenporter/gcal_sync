@@ -236,3 +236,85 @@ def test_event_utc() -> None:
     assert event.end.value == datetime.datetime(
         2022, 4, 12, 17, 0, 0, tzinfo=datetime.timezone.utc
     )
+
+
+def test_event_timezone_comparison() -> None:
+    """Compare different ways the same time can be returned."""
+
+    event1 = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Event #1",
+            "start": {
+                "dateTime": "2022-05-01T13:00:00-07:00",
+                "timeZone": "America/Los_Angeles",
+            },
+            "end": {
+                "dateTime": "2022-05-01T13:30:00-07:00",
+                "timeZone": "America/Los_Angeles",
+            },
+        }
+    )
+    event2 = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Event #2",
+            "start": {
+                "dateTime": "2022-05-01T20:00:00Z",
+                "timeZone": "UTC",
+            },
+            "end": {
+                "dateTime": "2022-05-01T20:30:00Z",
+                "timeZone": "UTC",
+            },
+        }
+    )
+    dt1 = event1.start.value
+    assert isinstance(dt1, datetime.datetime)
+    dt2 = event2.start.value
+    assert isinstance(dt2, datetime.datetime)
+    assert dt1 == dt2
+    assert dt1.astimezone(datetime.timezone.utc) == dt2.astimezone(
+        datetime.timezone.utc
+    )
+
+
+def test_event_timezone_comparison_zimetone_not_used() -> None:
+    """Compare different ways the same time can be returned."""
+
+    event1 = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Event #1",
+            "start": {
+                "dateTime": "2022-05-01T22:00:00+02:00",
+                "timeZone": "Europe/Amsterdam",
+            },
+            "end": {
+                "dateTime": "2022-05-01T23:00:00+02:00",
+                "timeZone": "Europe/Amsterdam",
+            },
+        }
+    )
+    event2 = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Event #2",
+            "start": {
+                "dateTime": "2022-05-01T20:00:00Z",
+                "timeZone": "Europe/Amsterdam",
+            },
+            "end": {
+                "dateTime": "2022-05-01T21:00:00Z",
+                "timeZone": "Europe/Amsterdam",
+            },
+        }
+    )
+    dt1 = event1.start.value
+    assert isinstance(dt1, datetime.datetime)
+    dt2 = event2.start.value
+    assert isinstance(dt2, datetime.datetime)
+    assert dt1 == dt2
+    assert dt1.astimezone(datetime.timezone.utc) == dt2.astimezone(
+        datetime.timezone.utc
+    )
