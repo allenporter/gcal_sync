@@ -98,7 +98,7 @@ async def test_list_events(
     assert url_request() == [
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
-        ",end,transparency)&timeMin=2022-04-30T01:31:02%2B00:00"
+        ",end,transparency,timeZone)&timeMin=2022-04-30T01:31:02%2B00:00"
     ]
     assert result.items == [
         Event(
@@ -150,7 +150,8 @@ async def test_list_events_with_date_limit(
     assert url_request() == [
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start,"
-        "end,transparency)&timeMin=2022-04-13T07:30:12-06:00&timeMax=2022-04-13T09:30:12-06:00"
+        "end,transparency,timeZone)&timeMin=2022-04-13T07:30:12-06:00"
+        "&timeMax=2022-04-13T09:30:12-06:00"
     ]
 
 
@@ -390,15 +391,15 @@ async def test_list_events_multiple_pages_with_iterator(
         # Request #1
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
-        ",end,transparency)&timeMin=2022-04-30T01:31:02%2B00:00",
+        ",end,transparency,timeZone)&timeMin=2022-04-30T01:31:02%2B00:00",
         # Request #2
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
-        ",end,transparency)&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-1",
+        ",end,transparency,timeZone)&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-1",
         # Request #3
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
-        ",end,transparency)&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-2",
+        ",end,transparency,timeZone)&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-2",
     ]
     assert items == [
         Event(
@@ -440,5 +441,5 @@ async def test_list_event_url_encoding(
         "/calendars/en.usa#holiday@group.v.calendar.google.com/events?maxResult=100"
         "&singleEvents=true&orderBy=startTime"
         "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
-        ",end,transparency)&timeMin=2022-04-30T01:31:02%2B00:00"
+        ",end,transparency,timeZone)&timeMin=2022-04-30T01:31:02%2B00:00"
     ]

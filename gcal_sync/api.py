@@ -12,7 +12,7 @@ from urllib.request import pathname2url
 from pydantic import BaseModel, Field, root_validator
 
 from .auth import AbstractAuth
-from .model import EVENT_FIELDS, Calendar, Event
+from .model import EVENT_FIELDS, Calendar, Event, validate_datetimes
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,19 +42,16 @@ class ListEventsRequest(BaseModel):
     """Api request to list events."""
 
     calendar_id: str = Field(alias="calendarId")
-    start_time: datetime.datetime = Field(default_factory=now, alias="timeMin")
+    start_time: datetime.datetime = Field(default=None, alias="timeMin")
     end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
     search: Optional[str] = Field(default=None, alias="q")
     page_token: Optional[str] = Field(default=None, alias="pageToken")
+    sync_token: Optional[str] = Field(default=None, alias="syncToken")
 
     @root_validator
     def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Validate the date or datetime fields are set properly."""
-        if start_time := values.get("start_time"):
-            values["start_time"] = start_time.replace(microsecond=0)
-        if end_time := values.get("end_time"):
-            values["end_time"] = end_time.replace(microsecond=0)
-        return values
+        return validate_datetimes(values)
 
     class Config:
         """Model configuration."""
@@ -68,6 +65,7 @@ class _ListEventsResponseModel(BaseModel):
     items: List[Event] = Field(default=[], alias="items")
     sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
     page_token: Optional[str] = Field(default=None, alias="nextPageToken")
+    timezone: Optional[str] = Field(default=None, alias="timeZone")
 
 
 class ListEventsResponse:
@@ -97,6 +95,11 @@ class ListEventsResponse:
     def page_token(self) -> str | None:
         """Return the page token in the response."""
         return self._model.page_token
+
+    @property
+    def timezone(self) -> str | None:
+        """Return the timezone in the response."""
+        return self._model.timezone
 
     async def __aiter__(self) -> AsyncIterator[ListEventsResponse]:
         """Async iterator to traverse through pages of responses."""
@@ -152,6 +155,8 @@ class GoogleCalendarService:
             "orderBy": "startTime",
             "fields": EVENT_API_FIELDS,
         }
+        if not request.start_time and not request.sync_token:
+            request.start_time = now()
         params.update(
             json.loads(
                 request.json(exclude_none=True, by_alias=True, exclude={"calendar_id"})
