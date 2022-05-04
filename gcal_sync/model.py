@@ -76,17 +76,3 @@ class Event(BaseModel):
         """Model configuration."""
 
         allow_population_by_field_name = True
-
-
-def validate_datetime(values: dict[str, Any], key: str) -> dict[str, Any]:
-    """Validate date/datetime request fields are set properly."""
-    if time := values.get(key):
-        values[key] = time.replace(microsecond=0)
-    return values
-
-
-def validate_datetimes(values: dict[str, Any]) -> dict[str, Any]:
-    """Validate the date or datetime fields are set properly."""
-    values = validate_datetime(values, "start_time")
-    values = validate_datetime(values, "end_time")
-    return values

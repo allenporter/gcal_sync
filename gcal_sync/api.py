@@ -12,7 +12,9 @@ from urllib.request import pathname2url
 from pydantic import BaseModel, Field, root_validator
 
 from .auth import AbstractAuth
-from .model import EVENT_FIELDS, Calendar, Event, validate_datetimes
+from .const import EVENTS
+from .model import EVENT_FIELDS, Calendar, Event
+from .store import CalendarStore
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +40,20 @@ def now() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
 
+def _validate_datetime(values: dict[str, Any], key: str) -> dict[str, Any]:
+    """Validate date/datetime request fields are set properly."""
+    if time := values.get(key):
+        values[key] = time.replace(microsecond=0)
+    return values
+
+
+def _validate_datetimes(values: dict[str, Any]) -> dict[str, Any]:
+    """Validate the date or datetime fields are set properly."""
+    values = _validate_datetime(values, "start_time")
+    values = _validate_datetime(values, "end_time")
+    return values
+
+
 class ListEventsRequest(BaseModel):
     """Api request to list events."""
 
@@ -51,7 +67,7 @@ class ListEventsRequest(BaseModel):
     @root_validator
     def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Validate the date or datetime fields are set properly."""
-        return validate_datetimes(values)
+        return _validate_datetimes(values)
 
     class Config:
         """Model configuration."""
@@ -178,3 +194,66 @@ class GoogleCalendarService:
             _ListEventsResponseModel.parse_obj(json_result), get_next_page
         )
         return result
+
+
+class LocalListEventsRequest(BaseModel):
+    """Api request to list events."""
+
+    start_time: datetime.datetime = Field(default_factory=now)
+    end_time: Optional[datetime.datetime] = Field(default=None)
+
+    @root_validator
+    def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Validate the date or datetime fields are set properly."""
+        return _validate_datetimes(values)
+
+    class Config:
+        """Model configuration."""
+
+        allow_population_by_field_name = True
+
+
+class LocalListEventsResponse(BaseModel):
+    """Api response containing a list of events."""
+
+    events: List[Event] = Field(default=[])
+
+
+class CalendarEventStoreService:
+    """Performs event lookups from the local store."""
+
+    def __init__(self, store: CalendarStore) -> None:
+        """Initialize CalendarEventStoreService."""
+        self._store = store
+
+    async def async_list_events(
+        self,
+        request: LocalListEventsRequest,
+    ) -> LocalListEventsResponse:
+        """Return the set of events matching the criteria."""
+
+        store_data = await self._store.async_load() or {}
+        store_data.setdefault(EVENTS, {})
+        events_data = store_data.get(EVENTS, {})
+
+        events = []
+        for event_data in events_data.values():
+            event = Event.parse_obj(event_data)
+            if request.start_time:
+                if event.end.date and request.start_time.date() > event.end.date:
+                    continue
+                if (
+                    isinstance(event.end.value, datetime.datetime)
+                    and request.start_time > event.end.value
+                ):
+                    continue
+            if request.end_time:
+                if event.start.date and request.end_time.date() < event.start.date:
+                    continue
+                if (
+                    isinstance(event.start.value, datetime.datetime)
+                    and request.end_time < event.start.value
+                ):
+                    continue
+            events.append(event)
+        return LocalListEventsResponse(events=events)

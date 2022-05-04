@@ -7,8 +7,8 @@ import aiohttp
 import pytest
 from freezegun import freeze_time
 
-from gcal_sync.api import GoogleCalendarService
-from gcal_sync.event_sync import EventSyncManager, LookupEventsRequest
+from gcal_sync.api import GoogleCalendarService, LocalListEventsRequest
+from gcal_sync.event_sync import CalendarEventSyncManager
 from gcal_sync.exceptions import ApiException
 from gcal_sync.model import DateOrDatetime, Event
 from gcal_sync.store import CalendarStore, InMemoryCalendarStore
@@ -28,18 +28,18 @@ def fake_store() -> CalendarStore:
 def fake_event_sync_manager(
     calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
     store: CalendarStore,
-) -> Callable[[], Awaitable[EventSyncManager]]:
+) -> Callable[[], Awaitable[CalendarEventSyncManager]]:
     """Fixture for an event sync manager."""
 
-    async def func() -> EventSyncManager:
+    async def func() -> CalendarEventSyncManager:
         service = await calendar_service_cb()
-        return EventSyncManager(service, CALENDAR_ID, store)
+        return CalendarEventSyncManager(service, CALENDAR_ID, store)
 
     return func
 
 
 async def test_sync_failure(
-    event_sync_manager_cb: Callable[[], Awaitable[EventSyncManager]],
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     response: ResponseResult,
 ) -> None:
     """Test list calendars API."""
@@ -53,7 +53,7 @@ async def test_sync_failure(
 
 @freeze_time("2022-04-05 07:31:02", tz_offset=-7)
 async def test_lookup_items(
-    event_sync_manager_cb: Callable[[], Awaitable[EventSyncManager]],
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
     url_request: Callable[[], str],
 ) -> None:
@@ -99,8 +99,8 @@ async def test_lookup_items(
         ",end,transparency,timeZone)&timeMin=2022-03-08T00:31:02"
     ]
 
-    result = await sync.async_lookup_events(
-        LookupEventsRequest(
+    result = await sync.store_service.async_list_events(
+        LocalListEventsRequest(
             start_time=datetime.datetime.fromisoformat("2022-04-12 00:00:00"),
             end_time=datetime.datetime.fromisoformat("2022-04-16 00:00:00"),
         )
@@ -124,8 +124,8 @@ async def test_lookup_items(
         ),
     ]
 
-    result = await sync.async_lookup_events(
-        LookupEventsRequest(
+    result = await sync.store_service.async_list_events(
+        LocalListEventsRequest(
             start_time=datetime.datetime.fromisoformat("2022-04-13 00:00:00"),
             end_time=datetime.datetime.fromisoformat("2022-04-14 00:00:00"),
         )
@@ -140,8 +140,8 @@ async def test_lookup_items(
             transparency="transparent",
         ),
     ]
-    result = await sync.async_lookup_events(
-        LookupEventsRequest(
+    result = await sync.store_service.async_list_events(
+        LocalListEventsRequest(
             start_time=datetime.datetime.fromisoformat("2022-04-15 00:00:00"),
             end_time=datetime.datetime.fromisoformat("2022-04-17 00:00:00"),
         )
@@ -157,16 +157,16 @@ async def test_lookup_items(
         ),
     ]
 
-    result = await sync.async_lookup_events(
-        LookupEventsRequest(
+    result = await sync.store_service.async_list_events(
+        LocalListEventsRequest(
             start_time=datetime.datetime.fromisoformat("2022-04-05 00:00:00"),
             end_time=datetime.datetime.fromisoformat("2022-04-07 00:00:00"),
         )
     )
     assert not result.events
 
-    result = await sync.async_lookup_events(
-        LookupEventsRequest(
+    result = await sync.store_service.async_list_events(
+        LocalListEventsRequest(
             start_time=datetime.datetime.fromisoformat("2022-04-21 00:00:00"),
             end_time=datetime.datetime.fromisoformat("2022-04-22 00:00:00"),
         )
@@ -176,7 +176,7 @@ async def test_lookup_items(
 
 @freeze_time("2022-04-05 07:31:02", tz_offset=-7)
 async def test_sync_date_pages(
-    event_sync_manager_cb: Callable[[], Awaitable[EventSyncManager]],
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
     url_request: Callable[[], str],
 ) -> None:
@@ -267,7 +267,7 @@ async def test_sync_date_pages(
 
 @freeze_time("2022-04-05 07:31:02", tz_offset=-7)
 async def test_sync_datetime_pages(
-    event_sync_manager_cb: Callable[[], Awaitable[EventSyncManager]],
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
     url_request: Callable[[], str],
 ) -> None:
@@ -358,7 +358,7 @@ async def test_sync_datetime_pages(
 
 @freeze_time("2022-04-05 07:31:02", tz_offset=-7)
 async def test_invalidated_sync_token(
-    event_sync_manager_cb: Callable[[], Awaitable[EventSyncManager]],
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
     response: ResponseResult,
     url_request: Callable[[], str],
@@ -404,7 +404,7 @@ async def test_invalidated_sync_token(
         ",end,transparency,timeZone)&timeMin=2022-03-08T00:31:02"
     ]
 
-    result = await sync.async_lookup_events(LookupEventsRequest())
+    result = await sync.store_service.async_list_events(LocalListEventsRequest())
     assert result.events == [
         Event(
             id="some-event-id-1",
@@ -451,7 +451,7 @@ async def test_invalidated_sync_token(
         "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
         ",end,transparency,timeZone)&timeMin=2022-03-08T00:31:02",
     ]
-    result = await sync.async_lookup_events(LookupEventsRequest())
+    result = await sync.store_service.async_list_events(LocalListEventsRequest())
     assert result.events == [
         Event(
             id="some-event-id-3",

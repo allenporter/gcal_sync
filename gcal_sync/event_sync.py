@@ -2,63 +2,37 @@
 # pylint: disable=duplicate-code
 import datetime
 import logging
-from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field, root_validator
-
-from .api import GoogleCalendarService, ListEventsRequest
+from .api import CalendarEventStoreService, GoogleCalendarService, ListEventsRequest
+from .const import EVENT_SYNC, EVENTS, SYNC_TOKEN, TIMEZONE
 from .exceptions import InvalidSyncTokenException
-from .model import Event, validate_datetimes
 from .store import CalendarStore, ScopedCalendarStore
 
 _LOGGER = logging.getLogger(__name__)
 
-EVENT_SYNC = "event_sync"
-EVENTS = "events"
-TIMEZONE = "timezone"
-SYNC_TOKEN = "sync_token"
 
-
-def now() -> datetime.datetime:
-    """Helper method to facilitate mocking in tests."""
-    return datetime.datetime.now(datetime.timezone.utc)
-
-
-class LookupEventsRequest(BaseModel):
-    """Api request to list events."""
-
-    start_time: datetime.datetime = Field(default_factory=now)
-    end_time: Optional[datetime.datetime] = Field(default=None)
-
-    @root_validator
-    def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
-        """Validate the date or datetime fields are set properly."""
-        return validate_datetimes(values)
-
-    class Config:
-        """Model configuration."""
-
-        allow_population_by_field_name = True
-
-
-class LookupEventsResponse(BaseModel):
-    """Api response containing a list of events."""
-
-    events: List[Event] = Field(default=[])
-
-
-class EventSyncManager:
+class CalendarEventSyncManager:
     """Manages synchronizing events from API to local store."""
 
     def __init__(
         self, api: GoogleCalendarService, calendar_id: str, store: CalendarStore
     ) -> None:
-        """Initialize EventSyncManager."""
+        """Initialize CalendarEventSyncManager."""
         self._api = api
         self._store = ScopedCalendarStore(
             ScopedCalendarStore(store, EVENT_SYNC), calendar_id
         )
         self._calendar_id = calendar_id
+
+    @property
+    def store_service(self) -> CalendarEventStoreService:
+        """Return the local API for fetching events."""
+        return CalendarEventStoreService(self._store)
+
+    @property
+    def api(self) -> GoogleCalendarService:
+        """Return the cloud API."""
+        return self._api
 
     async def run(self) -> None:
         """Run the event sync manager."""
@@ -105,35 +79,3 @@ class EventSyncManager:
             request.page_token = result.page_token
 
         await self._store.async_save(store_data)
-
-    async def async_lookup_events(
-        self,
-        request: LookupEventsRequest,
-    ) -> LookupEventsResponse:
-        """Return the set of events matching the criteria."""
-
-        store_data = await self._store.async_load() or {}
-        store_data.setdefault(EVENTS, {})
-        events_data = store_data.get(EVENTS, {})
-
-        events = []
-        for event_data in events_data.values():
-            event = Event.parse_obj(event_data)
-            if request.start_time:
-                if event.end.date and request.start_time.date() > event.end.date:
-                    continue
-                if (
-                    isinstance(event.end.value, datetime.datetime)
-                    and request.start_time > event.end.value
-                ):
-                    continue
-            if request.end_time:
-                if event.start.date and request.end_time.date() < event.start.date:
-                    continue
-                if (
-                    isinstance(event.start.value, datetime.datetime)
-                    and request.end_time < event.start.value
-                ):
-                    continue
-            events.append(event)
-        return LookupEventsResponse(events=events)
