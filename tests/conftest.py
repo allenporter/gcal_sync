@@ -13,6 +13,7 @@ from aiohttp.test_utils import TestClient
 from gcal_sync.api import GoogleCalendarService
 from gcal_sync.auth import AbstractAuth
 
+ResponseResult = Callable[[aiohttp.web.Response], None]
 ApiResult = Callable[[dict[str, Any]], None]
 ApiRequest = Callable[[], list[dict[str, Any]]]
 _T = TypeVar("_T")
@@ -139,12 +140,22 @@ def mock_calendar_service(
     return func
 
 
-@pytest.fixture(name="json_response")
-def mock_json_response(app: aiohttp.web.Application) -> ApiResult:
+@pytest.fixture(name="response")
+def mock_response(app: aiohttp.web.Application) -> ResponseResult:
     """Fixture to construct a fake API response."""
 
-    def _put_result(response: dict[str, Any]) -> None:
-        app["response"].append(aiohttp.web.json_response(response))
+    def _put_result(response: aiohttp.web.Response) -> None:
+        app["response"].append(response)
+
+    return _put_result
+
+
+@pytest.fixture(name="json_response")
+def mock_json_response(response: ResponseResult) -> ApiResult:
+    """Fixture to construct a fake API response."""
+
+    def _put_result(data: dict[str, Any]) -> None:
+        response(aiohttp.web.json_response(data))
 
     return _put_result
 

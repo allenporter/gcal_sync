@@ -11,3 +11,7 @@ class ApiException(GoogleCalendarException):
 
 class AuthException(ApiException):
     """Raised due to auth problems talking to API."""
+
+
+class InvalidSyncTokenException(ApiException):
+    """Raised when the sync token is invalid."""
