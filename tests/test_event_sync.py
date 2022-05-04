@@ -354,3 +354,110 @@ async def test_sync_datetime_pages(
         "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
         ",end,transparency,timeZone)&syncToken=sync-token-1",
     ]
+
+
+@freeze_time("2022-04-05 07:31:02", tz_offset=-7)
+async def test_invalidated_sync_token(
+    event_sync_manager_cb: Callable[[], Awaitable[EventSyncManager]],
+    json_response: ApiResult,
+    response: ResponseResult,
+    url_request: Callable[[], str],
+    request_reset: Callable[[], str],
+) -> None:
+    """Test lookup events API."""
+
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "summary": "Event 1",
+                    "description": "Event description 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                },
+                {
+                    "id": "some-event-id-2",
+                    "summary": "Event 2",
+                    "description": "Event description 2",
+                    "start": {
+                        "date": "2022-04-15",
+                    },
+                    "end": {
+                        "date": "2022-04-20",
+                    },
+                },
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+
+    sync = await event_sync_manager_cb()
+    await sync.run()
+    assert url_request() == [
+        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
+        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
+        ",end,transparency,timeZone)&timeMin=2022-03-08T00:31:02"
+    ]
+
+    result = await sync.async_lookup_events(LookupEventsRequest())
+    assert result.events == [
+        Event(
+            id="some-event-id-1",
+            summary="Event 1",
+            description="Event description 1",
+            start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
+        ),
+        Event(
+            id="some-event-id-2",
+            summary="Event 2",
+            description="Event description 2",
+            start=DateOrDatetime(date=datetime.date(2022, 4, 15)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
+        ),
+    ]
+
+    request_reset()
+    response(aiohttp.web.Response(status=410))  # Token invalid
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-3",
+                    "summary": "Event 3",
+                    "description": "Event description 3",
+                    "start": {
+                        "date": "2022-04-12",
+                    },
+                    "end": {
+                        "date": "2022-04-13",
+                    },
+                },
+            ],
+            "nextSyncToken": "sync-token-2",
+        }
+    )
+    await sync.run()
+    assert url_request() == [
+        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
+        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
+        ",end,transparency,timeZone)&syncToken=sync-token-1",
+        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
+        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
+        ",end,transparency,timeZone)&timeMin=2022-03-08T00:31:02",
+    ]
+    result = await sync.async_lookup_events(LookupEventsRequest())
+    assert result.events == [
+        Event(
+            id="some-event-id-3",
+            summary="Event 3",
+            description="Event description 3",
+            start=DateOrDatetime(date=datetime.date(2022, 4, 12)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 13)),
+        ),
+    ]

@@ -160,6 +160,17 @@ def mock_json_response(response: ResponseResult) -> ApiResult:
     return _put_result
 
 
+@pytest.fixture(name="request_reset")
+def mock_request_reset(app: aiohttp.web.Application) -> Callable[[], None]:
+    """Reset the request/response fixtures."""
+
+    def _reset() -> None:
+        app["request"].clear()
+        app["response"].clear()
+
+    return _reset
+
+
 @pytest.fixture(name="url_request")
 def mock_url_request(app: aiohttp.web.Application) -> Callable[[], list[str]]:
     """Fixture to return the requested url."""
