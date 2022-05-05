@@ -537,3 +537,110 @@ async def test_token_version_invalidation(
     result = await sync.store_service.async_list_events(LocalListEventsRequest())
     assert len(result.events) == 1
     assert result.events[0].id == "some-event-id-2"
+
+
+@freeze_time("2022-04-05 07:31:02", tz_offset=-7)
+async def test_canceled_events(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+) -> None:
+    """Test lookup events API."""
+
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "summary": "Event 1",
+                    "description": "Event description 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                },
+                {
+                    "id": "some-event-id-2",
+                    "summary": "Event 2",
+                    "description": "Event description 2",
+                    "start": {
+                        "date": "2022-04-15",
+                    },
+                    "end": {
+                        "date": "2022-04-20",
+                    },
+                },
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+
+    sync = await event_sync_manager_cb()
+    await sync.run()
+    result = await sync.store_service.async_list_events(
+        LocalListEventsRequest(
+            start_time=datetime.datetime.fromisoformat("0001-01-01T00:00:00"),
+        )
+    )
+    assert result.events == [
+        Event(
+            id="some-event-id-1",
+            summary="Event 1",
+            description="Event description 1",
+            start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
+        ),
+        Event(
+            id="some-event-id-2",
+            summary="Event 2",
+            description="Event description 2",
+            start=DateOrDatetime(date=datetime.date(2022, 4, 15)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
+        ),
+    ]
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "status": "cancelled",
+                },
+                {
+                    "id": "some-event-id-3",
+                    "summary": "Event 3",
+                    "description": "Event description 3",
+                    "start": {
+                        "date": "2022-04-15",
+                    },
+                    "end": {
+                        "date": "2022-04-20",
+                    },
+                },
+            ],
+            "nextSyncToken": "sync-token-2",
+        }
+    )
+    await sync.run()
+    result = await sync.store_service.async_list_events(
+        LocalListEventsRequest(
+            start_time=datetime.datetime.fromisoformat("0001-01-01T00:00:00"),
+        )
+    )
+    assert result.events == [
+        Event(
+            id="some-event-id-2",
+            summary="Event 2",
+            description="Event description 2",
+            start=DateOrDatetime(date=datetime.date(2022, 4, 15)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
+        ),
+        Event(
+            id="some-event-id-3",
+            summary="Event 3",
+            description="Event description 3",
+            start=DateOrDatetime(date=datetime.date(2022, 4, 15)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
+        ),
+    ]

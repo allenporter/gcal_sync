@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, root_validator
 
 from .auth import AbstractAuth
 from .const import EVENTS
-from .model import EVENT_FIELDS, Calendar, Event
+from .model import EVENT_FIELDS, Calendar, Event, EventStatusEnum
 from .store import CalendarStore
 
 _LOGGER = logging.getLogger(__name__)
@@ -239,6 +239,8 @@ class CalendarEventStoreService:
         events = []
         for event_data in events_data.values():
             event = Event.parse_obj(event_data)
+            if event.status == EventStatusEnum.CANCELLED:
+                continue
             if request.start_time:
                 if event.end.date and request.start_time.date() > event.end.date:
                     continue

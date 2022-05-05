@@ -6,7 +6,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from gcal_sync.model import Calendar, Event
+from gcal_sync.model import Calendar, Event, EventStatusEnum
 
 
 def test_calendar() -> None:
@@ -36,7 +36,7 @@ def test_event_with_date() -> None:
         {
             "kind": "calendar#event",
             "id": "some-event-id",
-            "status": "some-status",
+            "status": "confirmed",
             "summary": "Event summary",
             "description": "Event description",
             "location": "Event location",
@@ -52,6 +52,7 @@ def test_event_with_date() -> None:
     assert event.id == "some-event-id"
     assert event.summary == "Event summary"
     assert event.description == "Event description"
+    assert event.status == EventStatusEnum.CONFIRMED
     assert event.location == "Event location"
     assert event.transparency == "transparent"
     assert event.start
@@ -73,7 +74,6 @@ def test_event_datetime() -> None:
         {
             "kind": "calendar#event",
             "id": "some-event-id",
-            "status": "some-status",
             "summary": "Event summary",
             "start": {
                 "dateTime": "2022-04-12T16:30:00-08:00",
@@ -86,6 +86,7 @@ def test_event_datetime() -> None:
     assert event.id == "some-event-id"
     assert event.summary == "Event summary"
     assert event.description is None
+    assert event.status == EventStatusEnum.CONFIRMED
     assert event.location is None
     tzinfo = datetime.timezone(datetime.timedelta(hours=-8))
 
@@ -113,7 +114,6 @@ def test_invalid_datetime() -> None:
     base_event = {
         "kind": "calendar#event",
         "id": "some-event-id",
-        "status": "some-status",
         "summary": "Event summary",
         "end": {
             "dateTime": "2022-04-12T17:00:00-08:00",
@@ -152,7 +152,6 @@ def test_event_timezone() -> None:
         {
             "kind": "calendar#event",
             "id": "some-event-id",
-            "status": "some-status",
             "summary": "Event summary",
             "start": {
                 "dateTime": "2022-04-12T16:30:00",
@@ -199,7 +198,6 @@ def test_event_utc() -> None:
         {
             "kind": "calendar#event",
             "id": "some-event-id",
-            "status": "some-status",
             "summary": "Event summary",
             "start": {
                 "dateTime": "2022-04-12T16:30:00Z",
@@ -318,3 +316,31 @@ def test_event_timezone_comparison_zimetone_not_used() -> None:
     assert dt1.astimezone(datetime.timezone.utc) == dt2.astimezone(
         datetime.timezone.utc
     )
+
+
+def test_event_cancelled() -> None:
+    """Exercise basic parsing of an event API response."""
+
+    event = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "status": "cancelled",
+        }
+    )
+    assert event.id == "some-event-id"
+    assert not event.summary
+    assert event.description is None
+    assert event.location is None
+    assert event.status == EventStatusEnum.CANCELLED
+
+
+def test_required_fields() -> None:
+    """Exercise required fields for normal non-deleted events."""
+
+    with pytest.raises(ValidationError):
+        Event.parse_obj(
+            {
+                "id": "some-event-id",
+                "status": "confirmed",
+            }
+        )
