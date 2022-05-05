@@ -4,11 +4,15 @@ import datetime
 import logging
 
 from .api import CalendarEventStoreService, GoogleCalendarService, ListEventsRequest
-from .const import EVENT_SYNC, EVENTS, SYNC_TOKEN, TIMEZONE
+from .const import EVENT_SYNC, EVENTS, SYNC_TOKEN, SYNC_TOKEN_VERSION, TIMEZONE
 from .exceptions import InvalidSyncTokenException
 from .store import CalendarStore, ScopedCalendarStore
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# Can be incremented to blow away existing store
+VERSION = 1
 
 
 class CalendarEventSyncManager:
@@ -40,8 +44,18 @@ class CalendarEventSyncManager:
         store_data = await self._store.async_load() or {}
         store_data.setdefault(EVENTS, {})
 
+        # Invalid existing data in store if no longer valid
+        sync_token_version = store_data.get(SYNC_TOKEN_VERSION)
+        if sync_token_version and sync_token_version < VERSION:
+            _LOGGER.debug(
+                "Invaliding token with version {sync_token_version}, {TOKEN_VERSION}"
+            )
+            store_data[SYNC_TOKEN] = None
+            store_data[EVENTS] = {}
+
         # Load sync token from last execution if any
         sync_token = store_data.get(SYNC_TOKEN)
+
         request = ListEventsRequest(calendar_id=self._calendar_id)
         if not sync_token:
             _LOGGER.debug(
@@ -75,6 +89,7 @@ class CalendarEventSyncManager:
 
             if not result.page_token:
                 store_data[SYNC_TOKEN] = result.sync_token
+                store_data[SYNC_TOKEN_VERSION] = VERSION
                 break
             request.page_token = result.page_token
 
