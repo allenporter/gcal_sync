@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import zoneinfo
+from enum import Enum
 from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field, root_validator
@@ -61,6 +62,14 @@ class DateOrDatetime(BaseModel):
         arbitrary_types_allowed = True
 
 
+class EventStatusEnum(str, Enum):
+    "Status of the event"
+
+    CONFIRMED = "confirmed"
+    TENTATIVE = "tentative"
+    CANCELLED = "cancelled"
+
+
 class Event(BaseModel):
     """A single event on a calendar."""
 
@@ -71,6 +80,21 @@ class Event(BaseModel):
     description: Optional[str]
     location: Optional[str]
     transparency: str = Field(default="opaque")
+    # Note deleted events are only returned in some scenarios based on request options
+    # such as enabling incremental sync or explicitly asking for deleted items. That is,
+    # most users should not need to check the status.
+    status: EventStatusEnum = EventStatusEnum.CONFIRMED
+
+    @root_validator(pre=True)
+    def allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Special case for canceled event tombstones that are missing required fields."""
+        if status := values.get("status"):
+            if status == EventStatusEnum.CANCELLED:
+                if "start" not in values:
+                    values["start"] = DateOrDatetime(date=datetime.date.min)
+                if "end" not in values:
+                    values["end"] = DateOrDatetime(date=datetime.date.min)
+        return values
 
     class Config:
         """Model configuration."""
