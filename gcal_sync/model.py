@@ -10,7 +10,10 @@ from typing import Any, Optional, Union
 from pydantic import BaseModel, Field, root_validator
 
 DATE_STR_FORMAT = "%Y-%m-%d"
-EVENT_FIELDS = "id,summary,description,location,start,end,transparency,timeZone"
+EVENT_FIELDS = (
+    "id,summary,description,location,start,end,transparency,timeZone,eventType,"
+    "visibility,attendees,attendeesOmitted"
+)
 
 
 class Calendar(BaseModel):
@@ -63,11 +66,37 @@ class DateOrDatetime(BaseModel):
 
 
 class EventStatusEnum(str, Enum):
-    "Status of the event"
+    "Status of the event."
 
     CONFIRMED = "confirmed"
     TENTATIVE = "tentative"
     CANCELLED = "cancelled"
+
+
+class EventTypeEnum(str, Enum):
+    """Type of the event."""
+
+    DEFAULT = "default"
+    OUT_OF_OFFICE = "outOfOffice"
+    FOCUS_TIME = "focusTime"
+
+
+class VisibilityEnum(str, Enum):
+    """Visibility of the event."""
+
+    DEFAULT = "default"
+    PUBLIC = "public"
+    PRIVATE = "private"  # Same as confidential
+
+
+class Attendee(BaseModel):
+    """An attendee of an event."""
+
+    id: Optional[str] = None
+    email: str = ""
+    displayName: Optional[str] = None
+    optional: bool = False
+    comment: Optional[str] = None
 
 
 class Event(BaseModel):
@@ -84,6 +113,10 @@ class Event(BaseModel):
     # such as enabling incremental sync or explicitly asking for deleted items. That is,
     # most users should not need to check the status.
     status: EventStatusEnum = EventStatusEnum.CONFIRMED
+    event_type: EventTypeEnum = Field(alias="eventType", default=EventTypeEnum.DEFAULT)
+    visibility: VisibilityEnum = VisibilityEnum.DEFAULT
+    attendees: list[Attendee] = []
+    attendeesOmitted: bool = False
 
     @root_validator(pre=True)
     def allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
@@ -94,6 +127,14 @@ class Event(BaseModel):
                     values["start"] = DateOrDatetime(date=datetime.date.min)
                 if "end" not in values:
                     values["end"] = DateOrDatetime(date=datetime.date.min)
+        return values
+
+    @root_validator(pre=True)
+    def adjust_visibility(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Convert legacy visibility types to new types."""
+        if visibility := values.get("visibility"):
+            if visibility == "confidential":
+                values["visibility"] = "private"
         return values
 
     class Config:

@@ -6,7 +6,14 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from gcal_sync.model import Calendar, Event, EventStatusEnum
+from gcal_sync.model import (
+    Attendee,
+    Calendar,
+    Event,
+    EventStatusEnum,
+    EventTypeEnum,
+    VisibilityEnum,
+)
 
 
 def test_calendar() -> None:
@@ -344,3 +351,106 @@ def test_required_fields() -> None:
                 "status": "confirmed",
             }
         )
+
+
+@pytest.mark.parametrize(
+    "api_event_type,event_type",
+    [
+        ("default", EventTypeEnum.DEFAULT),
+        ("focusTime", EventTypeEnum.FOCUS_TIME),
+        ("outOfOffice", EventTypeEnum.OUT_OF_OFFICE),
+    ],
+)
+def test_event_type(api_event_type: str, event_type: EventTypeEnum) -> None:
+    """Exercise basic parsing of an event API response."""
+
+    event = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "eventType": api_event_type,
+            "summary": "Event summary",
+            "start": {
+                "date": "2022-04-12",
+            },
+            "end": {
+                "date": "2022-04-13",
+            },
+        }
+    )
+    assert event.id == "some-event-id"
+    assert event.summary == "Event summary"
+    assert event.event_type == event_type
+
+
+@pytest.mark.parametrize(
+    "api_visibility,visibility",
+    [
+        ("default", VisibilityEnum.DEFAULT),
+        ("public", VisibilityEnum.PUBLIC),
+        ("private", VisibilityEnum.PRIVATE),
+        ("confidential", VisibilityEnum.PRIVATE),
+    ],
+)
+def test_visibility_enum(api_visibility: str, visibility: VisibilityEnum) -> None:
+    """Exercise basic parsing of an event API response."""
+
+    event = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "visibility": api_visibility,
+            "summary": "Event summary",
+            "start": {
+                "date": "2022-04-12",
+            },
+            "end": {
+                "date": "2022-04-13",
+            },
+        }
+    )
+    assert event.id == "some-event-id"
+    assert event.summary == "Event summary"
+    assert event.visibility == visibility
+
+
+def test_attendees() -> None:
+    """Test event attendees."""
+
+    event = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Event summary",
+            "start": {
+                "date": "2022-04-12",
+            },
+            "end": {
+                "date": "2022-04-13",
+            },
+            "attendees": [
+                {
+                    "id": "attendee-id-1",
+                    "email": "example1@example.com",
+                    "displayName": "Example 1",
+                    "comment": "comment 1",
+                },
+                {
+                    "id": "attendee-id-2",
+                    "email": "example2@example.com",
+                    "displayName": "Example 2",
+                },
+            ],
+        }
+    )
+    assert len(event.attendees) == 2
+    assert event.attendees == [
+        Attendee(
+            id="attendee-id-1",
+            email="example1@example.com",
+            displayName="Example 1",
+            comment="comment 1",
+        ),
+        Attendee(
+            id="attendee-id-2",
+            email="example2@example.com",
+            displayName="Example 2",
+        ),
+    ]
