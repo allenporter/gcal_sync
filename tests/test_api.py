@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from freezegun import freeze_time
 
 from gcal_sync.api import GoogleCalendarService, ListEventsRequest
-from gcal_sync.model import Calendar, DateOrDatetime, Event
+from gcal_sync.model import EVENT_FIELDS, Calendar, DateOrDatetime, Event
 
 from .conftest import ApiRequest, ApiResult
 
@@ -97,8 +97,8 @@ async def test_list_events(
     )
     assert url_request() == [
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
-        ",end,transparency,timeZone)&timeMin=2022-04-30T01:31:02%2B00:00"
+        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        "&timeMin=2022-04-30T01:31:02%2B00:00"
     ]
     assert result.items == [
         Event(
@@ -149,9 +149,8 @@ async def test_list_events_with_date_limit(
     )
     assert url_request() == [
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start,"
-        "end,transparency,timeZone)&timeMin=2022-04-13T07:30:12-06:00"
-        "&timeMax=2022-04-13T09:30:12-06:00"
+        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        "&timeMin=2022-04-13T07:30:12-06:00&timeMax=2022-04-13T09:30:12-06:00"
     ]
 
 
@@ -390,16 +389,16 @@ async def test_list_events_multiple_pages_with_iterator(
     assert url_request() == [
         # Request #1
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
-        ",end,transparency,timeZone)&timeMin=2022-04-30T01:31:02%2B00:00",
+        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        "&timeMin=2022-04-30T01:31:02%2B00:00",
         # Request #2
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
-        ",end,transparency,timeZone)&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-1",
+        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        "&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-1",
         # Request #3
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
-        ",end,transparency,timeZone)&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-2",
+        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        "&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-2",
     ]
     assert items == [
         Event(
@@ -440,6 +439,6 @@ async def test_list_event_url_encoding(
     assert url_request() == [
         "/calendars/en.usa#holiday@group.v.calendar.google.com/events?maxResult=100"
         "&singleEvents=true&orderBy=startTime"
-        "&fields=kind,nextPageToken,nextSyncToken,items(id,summary,description,location,start"
-        ",end,transparency,timeZone)&timeMin=2022-04-30T01:31:02%2B00:00"
+        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        "&timeMin=2022-04-30T01:31:02%2B00:00"
     ]
