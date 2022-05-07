@@ -9,10 +9,10 @@ import pytest
 from freezegun import freeze_time
 
 from gcal_sync.api import GoogleCalendarService, LocalListEventsRequest
-from gcal_sync.event_sync import VERSION, CalendarEventSyncManager
 from gcal_sync.exceptions import ApiException
 from gcal_sync.model import EVENT_FIELDS, DateOrDatetime, Event
 from gcal_sync.store import CalendarStore, InMemoryCalendarStore
+from gcal_sync.sync import VERSION, CalendarEventSyncManager
 
 from .conftest import ApiResult, ResponseResult
 
@@ -526,7 +526,7 @@ async def test_token_version_invalidation(
         }
     )
 
-    with patch("gcal_sync.event_sync.VERSION", VERSION + 1):
+    with patch("gcal_sync.sync.VERSION", VERSION + 1):
         await sync.run()
 
     assert url_request() == [
