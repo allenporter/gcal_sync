@@ -12,7 +12,7 @@ from urllib.request import pathname2url
 from pydantic import BaseModel, Field, root_validator
 
 from .auth import AbstractAuth
-from .const import EVENTS
+from .const import ITEMS
 from .model import EVENT_FIELDS, Calendar, Event, EventStatusEnum
 from .store import CalendarStore
 
@@ -233,8 +233,8 @@ class CalendarEventStoreService:
         """Return the set of events matching the criteria."""
 
         store_data = await self._store.async_load() or {}
-        store_data.setdefault(EVENTS, {})
-        events_data = store_data.get(EVENTS, {})
+        store_data.setdefault(ITEMS, {})
+        events_data = store_data.get(ITEMS, {})
 
         events = []
         for event_data in events_data.values():
