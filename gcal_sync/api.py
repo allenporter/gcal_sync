@@ -6,7 +6,7 @@ import datetime
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 from urllib.request import pathname2url
 
 from pydantic import BaseModel, Field, root_validator
@@ -27,14 +27,25 @@ CALENDAR_LIST_URL = "users/me/calendarList"
 CALENDAR_EVENTS_URL = "calendars/{calendar_id}/events"
 
 
-class CalendarListRequest(BaseModel):
-    """Api request to return a list of calendars."""
+class SyncableRequest(BaseModel):
+    """Base class for a request that supports sync."""
 
     page_token: Optional[str] = Field(default=None, alias="pageToken")
     sync_token: Optional[str] = Field(default=None, alias="syncToken")
 
 
-class CalendarListResponse(BaseModel):
+class SyncableResponse(BaseModel):
+    """Base class for an API response that supports sync."""
+
+    page_token: Optional[str] = Field(default=None, alias="nextPageToken")
+    sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
+
+
+class CalendarListRequest(SyncableRequest):
+    """Api request to return a list of calendars."""
+
+
+class CalendarListResponse(SyncableResponse):
     """Api response containing a list of calendars."""
 
     items: List[Calendar] = []
@@ -61,15 +72,13 @@ def _validate_datetimes(values: dict[str, Any]) -> dict[str, Any]:
     return values
 
 
-class ListEventsRequest(BaseModel):
+class ListEventsRequest(SyncableRequest):
     """Api request to list events."""
 
     calendar_id: str = Field(alias="calendarId")
     start_time: datetime.datetime = Field(default=None, alias="timeMin")
     end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
     search: Optional[str] = Field(default=None, alias="q")
-    page_token: Optional[str] = Field(default=None, alias="pageToken")
-    sync_token: Optional[str] = Field(default=None, alias="syncToken")
 
     @root_validator
     def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
@@ -82,12 +91,10 @@ class ListEventsRequest(BaseModel):
         allow_population_by_field_name = True
 
 
-class _ListEventsResponseModel(BaseModel):
+class _ListEventsResponseModel(SyncableResponse):
     """Api response containing a list of events."""
 
-    items: List[Event] = Field(default=[], alias="items")
-    sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
-    page_token: Optional[str] = Field(default=None, alias="nextPageToken")
+    items: List[Event] = []
     timezone: Optional[str] = Field(default=None, alias="timeZone")
 
 
@@ -97,7 +104,7 @@ class ListEventsResponse:
     def __init__(
         self,
         model: _ListEventsResponseModel,
-        get_next_page: Callable[[Optional[str]], Awaitable[Dict[str, Any]]]
+        get_next_page: Callable[[str | None], Awaitable[_ListEventsResponseModel]]
         | None = None,
     ) -> None:
         """initialize ListEventsResponse."""
@@ -131,10 +138,8 @@ class ListEventsResponse:
             yield response
             if not response.page_token or not self._get_next_page:
                 break
-            json_result = await self._get_next_page(response.page_token)
-            response = ListEventsResponse(
-                _ListEventsResponseModel.parse_obj(json_result)
-            )
+            page_result = await self._get_next_page(response.page_token)
+            response = ListEventsResponse(page_result)
 
 
 class GoogleCalendarService:
@@ -176,6 +181,21 @@ class GoogleCalendarService:
         request: ListEventsRequest,
     ) -> ListEventsResponse:
         """Return the list of events."""
+
+        async def get_next_page(page_token: str | None) -> _ListEventsResponseModel:
+            if page_token is not None:
+                request.page_token = page_token
+            return await self.async_list_events_page(request)
+
+        page_result = await get_next_page(None)
+        result = ListEventsResponse(page_result, get_next_page)
+        return result
+
+    async def async_list_events_page(
+        self,
+        request: ListEventsRequest,
+    ) -> _ListEventsResponseModel:
+        """Return the list of events."""
         params = {
             "maxResult": EVENT_PAGE_SIZE,
             "singleEvents": "true",
@@ -189,22 +209,12 @@ class GoogleCalendarService:
                 request.json(exclude_none=True, by_alias=True, exclude={"calendar_id"})
             )
         )
-
-        async def get_next_page(page_token: str | None) -> dict[str, Any]:
-            if page_token is not None:
-                params["pageToken"] = page_token
-            return await self._auth.get_json(
-                CALENDAR_EVENTS_URL.format(
-                    calendar_id=pathname2url(request.calendar_id)
-                ),
-                params=params,
-            )
-
-        json_result = await get_next_page(None)
-        result = ListEventsResponse(
-            _ListEventsResponseModel.parse_obj(json_result), get_next_page
+        result = await self._auth.get_json(
+            CALENDAR_EVENTS_URL.format(calendar_id=pathname2url(request.calendar_id)),
+            params=params,
         )
-        return result
+        _ListEventsResponseModel.update_forward_refs()
+        return _ListEventsResponseModel.parse_obj(result)
 
 
 class LocalCalendarListResponse(BaseModel):

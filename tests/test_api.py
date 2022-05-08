@@ -394,11 +394,11 @@ async def test_list_events_multiple_pages_with_iterator(
         # Request #2
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
-        "&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-1",
+        "&pageToken=page-token-1&timeMin=2022-04-30T01:31:02%2B00:00",
         # Request #3
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
-        "&timeMin=2022-04-30T01:31:02%2B00:00&pageToken=page-token-2",
+        "&pageToken=page-token-2&timeMin=2022-04-30T01:31:02%2B00:00",
     ]
     assert items == [
         Event(

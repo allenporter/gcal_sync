@@ -352,7 +352,7 @@ async def test_event_sync_date_pages(
         "&timeMin=2022-03-08T00:31:02",
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
-        "&timeMin=2022-03-08T00:31:02&pageToken=page-token-1",
+        "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
     ]
 
     json_response(
@@ -380,7 +380,7 @@ async def test_event_sync_date_pages(
         "&timeMin=2022-03-08T00:31:02",
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
-        "&timeMin=2022-03-08T00:31:02&pageToken=page-token-1",
+        "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
         "&syncToken=sync-token-1",
@@ -443,7 +443,7 @@ async def test_event_sync_datetime_pages(
         "&timeMin=2022-03-08T00:31:02",
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
-        "&timeMin=2022-03-08T00:31:02&pageToken=page-token-1",
+        "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
     ]
 
     json_response(
@@ -471,7 +471,7 @@ async def test_event_sync_datetime_pages(
         "&timeMin=2022-03-08T00:31:02",
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
-        "&timeMin=2022-03-08T00:31:02&pageToken=page-token-1",
+        "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
         "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
         f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
         "&syncToken=sync-token-1",
