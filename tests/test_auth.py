@@ -207,3 +207,18 @@ async def test_auth_refresh_error(
     auth = await refreshing_auth_client()
     with pytest.raises(AuthException):
         await auth.get_json("some-path")
+
+
+async def test_unavailable_error(
+    app: aiohttp.web.Application, auth_client: Callable[[str], Awaitable[AbstractAuth]]
+) -> None:
+    """Test of basic request/response handling."""
+
+    async def handler(_: aiohttp.web.Request) -> aiohttp.web.Response:
+        return aiohttp.web.Response(status=500)
+
+    app.router.add_get("/path-prefix/some-path", handler)
+
+    auth = await auth_client("/path-prefix")
+    with pytest.raises(ApiException):
+        await auth.get_json("some-path")
