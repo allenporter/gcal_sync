@@ -765,3 +765,63 @@ async def test_canceled_events(
             end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
         ),
     ]
+
+
+async def test_event_sync_recover_failure(
+    calendar_list_sync_manager_cb: Callable[[], Awaitable[CalendarListSyncManager]],
+    json_response: ApiResult,
+    response: ResponseResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test list calendars API."""
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "calendar-id-1",
+                    "summary": "Calendar 1",
+                },
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+    sync = await calendar_list_sync_manager_cb()
+    await sync.run()
+    assert url_request() == ["/users/me/calendarList"]
+
+    response(aiohttp.web.Response(status=500))
+    with pytest.raises(ApiException):
+        await sync.run()
+    assert url_request() == [
+        "/users/me/calendarList",
+        "/users/me/calendarList?syncToken=sync-token-1",
+    ]
+
+    result = await sync.store_service.async_list_calendars()
+    assert result.calendars == [
+        Calendar(id="calendar-id-1", summary="Calendar 1"),
+    ]
+
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "calendar-id-2",
+                    "summary": "Calendar 2",
+                },
+            ],
+            "nextSyncToken": "sync-token-2",
+        }
+    )
+
+    await sync.run()
+    assert url_request() == [
+        "/users/me/calendarList",
+        "/users/me/calendarList?syncToken=sync-token-1",
+        "/users/me/calendarList?syncToken=sync-token-1",
+    ]
+    result = await sync.store_service.async_list_calendars()
+    assert result.calendars == [
+        Calendar(id="calendar-id-1", summary="Calendar 1"),
+        Calendar(id="calendar-id-2", summary="Calendar 2"),
+    ]
