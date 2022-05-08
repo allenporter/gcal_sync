@@ -27,6 +27,13 @@ CALENDAR_LIST_URL = "users/me/calendarList"
 CALENDAR_EVENTS_URL = "calendars/{calendar_id}/events"
 
 
+class CalendarListRequest(BaseModel):
+    """Api request to return a list of calendars."""
+
+    page_token: Optional[str] = Field(default=None, alias="pageToken")
+    sync_token: Optional[str] = Field(default=None, alias="syncToken")
+
+
 class CalendarListResponse(BaseModel):
     """Api response containing a list of calendars."""
 
@@ -141,10 +148,14 @@ class GoogleCalendarService:
         self._auth = auth
 
     async def async_list_calendars(
-        self,
+        self, request: CalendarListRequest | None = None
     ) -> CalendarListResponse:
         """Return the list of calendars the user has added to their list."""
-        result = await self._auth.get_json(CALENDAR_LIST_URL)
+        params = {}
+        if request:
+            params = json.loads(request.json(exclude_none=True, by_alias=True))
+        _LOGGER.debug(params)
+        result = await self._auth.get_json(CALENDAR_LIST_URL, params=params)
         return CalendarListResponse.parse_obj(result)
 
     async def async_create_event(
@@ -196,6 +207,12 @@ class GoogleCalendarService:
         return result
 
 
+class LocalCalendarListResponse(BaseModel):
+    """Api response containing a list of calendars."""
+
+    calendars: List[Calendar] = []
+
+
 class LocalListEventsRequest(BaseModel):
     """Api request to list events."""
 
@@ -217,6 +234,26 @@ class LocalListEventsResponse(BaseModel):
     """Api response containing a list of events."""
 
     events: List[Event] = Field(default=[])
+
+
+class CalendarListStoreService:
+    """Performs calendar list lookups from the local store."""
+
+    def __init__(self, store: CalendarStore) -> None:
+        """Initialize CalendarEventStoreService."""
+        self._store = store
+
+    async def async_list_calendars(
+        self,
+    ) -> LocalCalendarListResponse:
+        """Return the set of events matching the criteria."""
+        store_data = await self._store.async_load() or {}
+        store_data.setdefault(ITEMS, {})
+        items = store_data.get(ITEMS, {})
+
+        return LocalCalendarListResponse(
+            calendars=[Calendar.parse_obj(item) for item in items.values()]
+        )
 
 
 class CalendarEventStoreService:

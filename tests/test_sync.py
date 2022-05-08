@@ -10,9 +10,9 @@ from freezegun import freeze_time
 
 from gcal_sync.api import GoogleCalendarService, LocalListEventsRequest
 from gcal_sync.exceptions import ApiException
-from gcal_sync.model import EVENT_FIELDS, DateOrDatetime, Event
+from gcal_sync.model import EVENT_FIELDS, Calendar, DateOrDatetime, Event
 from gcal_sync.store import CalendarStore, InMemoryCalendarStore
-from gcal_sync.sync import VERSION, CalendarEventSyncManager
+from gcal_sync.sync import VERSION, CalendarEventSyncManager, CalendarListSyncManager
 
 from .conftest import ApiResult, ResponseResult
 
@@ -23,6 +23,20 @@ CALENDAR_ID = "some-calendar-id"
 def fake_store() -> CalendarStore:
     """Fixture for a calendar store."""
     return InMemoryCalendarStore()
+
+
+@pytest.fixture(name="calendar_list_sync_manager_cb")
+def fake_calendar_list_sync_manager(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    store: CalendarStore,
+) -> Callable[[], Awaitable[CalendarListSyncManager]]:
+    """Fixture for an event sync manager."""
+
+    async def func() -> CalendarListSyncManager:
+        service = await calendar_service_cb()
+        return CalendarListSyncManager(service, store)
+
+    return func
 
 
 @pytest.fixture(name="event_sync_manager_cb")
@@ -39,7 +53,52 @@ def fake_event_sync_manager(
     return func
 
 
-async def test_sync_failure(
+async def test_calendar_list_sync_failure(
+    calendar_list_sync_manager_cb: Callable[[], Awaitable[CalendarListSyncManager]],
+    response: ResponseResult,
+) -> None:
+    """Test list calendars API."""
+
+    response(aiohttp.web.Response(status=500))
+
+    sync = await calendar_list_sync_manager_cb()
+    with pytest.raises(ApiException):
+        await sync.run()
+
+
+async def test_list_calendars(
+    calendar_list_sync_manager_cb: Callable[[], Awaitable[CalendarListSyncManager]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test list calendars API."""
+
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "calendar-id-1",
+                    "summary": "Calendar 1",
+                },
+                {
+                    "id": "calendar-id-2",
+                    "summary": "Calendar 2",
+                },
+            ]
+        }
+    )
+    sync = await calendar_list_sync_manager_cb()
+    await sync.run()
+    assert url_request() == ["/users/me/calendarList"]
+
+    result = await sync.store_service.async_list_calendars()
+    assert result.calendars == [
+        Calendar(id="calendar-id-1", summary="Calendar 1"),
+        Calendar(id="calendar-id-2", summary="Calendar 2"),
+    ]
+
+
+async def test_event_sync_failure(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     response: ResponseResult,
 ) -> None:
@@ -53,7 +112,7 @@ async def test_sync_failure(
 
 
 @freeze_time("2022-04-05 07:31:02", tz_offset=-7)
-async def test_lookup_items(
+async def test_event_lookup_items(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
     url_request: Callable[[], str],
@@ -176,7 +235,7 @@ async def test_lookup_items(
 
 
 @freeze_time("2022-04-05 07:31:02", tz_offset=-7)
-async def test_sync_date_pages(
+async def test_event_sync_date_pages(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
     url_request: Callable[[], str],
@@ -267,7 +326,7 @@ async def test_sync_date_pages(
 
 
 @freeze_time("2022-04-05 07:31:02", tz_offset=-7)
-async def test_sync_datetime_pages(
+async def test_event_sync_datetime_pages(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
     url_request: Callable[[], str],
@@ -358,7 +417,7 @@ async def test_sync_datetime_pages(
 
 
 @freeze_time("2022-04-05 07:31:02", tz_offset=-7)
-async def test_invalidated_sync_token(
+async def test_event_invalidated_sync_token(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
     response: ResponseResult,
@@ -465,7 +524,7 @@ async def test_invalidated_sync_token(
 
 
 @freeze_time("2022-04-05 07:31:02", tz_offset=-7)
-async def test_token_version_invalidation(
+async def test_event_token_version_invalidation(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
     url_request: Callable[[], str],
