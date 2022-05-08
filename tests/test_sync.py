@@ -98,6 +98,68 @@ async def test_list_calendars(
     ]
 
 
+async def test_list_calendars_pagess(
+    calendar_list_sync_manager_cb: Callable[[], Awaitable[CalendarListSyncManager]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test list calendars API."""
+
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "calendar-id-1",
+                    "summary": "Calendar 1",
+                },
+            ],
+            "nextPageToken": "page-token-1",
+        }
+    )
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "calendar-id-2",
+                    "summary": "Calendar 2",
+                },
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+    sync = await calendar_list_sync_manager_cb()
+    await sync.run()
+    assert url_request() == [
+        "/users/me/calendarList",
+        "/users/me/calendarList?pageToken=page-token-1",
+    ]
+
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "calendar-id-3",
+                    "summary": "Calendar 3",
+                },
+            ],
+            "nextSyncToken": "page-token-2",
+        }
+    )
+    await sync.run()
+    assert url_request() == [
+        "/users/me/calendarList",
+        "/users/me/calendarList?pageToken=page-token-1",
+        "/users/me/calendarList?syncToken=sync-token-1",
+    ]
+
+    result = await sync.store_service.async_list_calendars()
+    assert result.calendars == [
+        Calendar(id="calendar-id-1", summary="Calendar 1"),
+        Calendar(id="calendar-id-2", summary="Calendar 2"),
+        Calendar(id="calendar-id-3", summary="Calendar 3"),
+    ]
+
+
 async def test_event_sync_failure(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     response: ResponseResult,
