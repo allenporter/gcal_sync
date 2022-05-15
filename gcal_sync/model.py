@@ -11,8 +11,8 @@ from pydantic import BaseModel, Field, root_validator
 
 DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
-    "id,summary,description,location,start,end,transparency"  # ,eventType,"
-    #    "visibility,attendees,attendeesOmitted"
+    "id,summary,description,location,start,end,transparency,eventType,"
+    "visibility,attendees,attendeesOmitted"
 )
 
 
