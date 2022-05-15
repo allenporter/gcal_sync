@@ -20,7 +20,7 @@ from .api import (
 )
 from .const import CALENDAR_LIST_SYNC, EVENT_SYNC, ITEMS, SYNC_TOKEN, SYNC_TOKEN_VERSION
 from .exceptions import InvalidSyncTokenException
-from .store import CalendarStore, ScopedCalendarStore
+from .store import CalendarStore, InMemoryCalendarStore, ScopedCalendarStore
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -88,15 +88,26 @@ async def _run_sync(
 class CalendarListSyncManager:
     """Manages synchronizing a calend arlist from API to local store."""
 
-    def __init__(self, api: GoogleCalendarService, store: CalendarStore) -> None:
+    def __init__(
+        self, api: GoogleCalendarService, store: CalendarStore | None = None
+    ) -> None:
         """Initialize CalendarListSyncManager."""
         self._api = api
-        self._store = ScopedCalendarStore(store, CALENDAR_LIST_SYNC)
+        self._store = (
+            ScopedCalendarStore(store, CALENDAR_LIST_SYNC)
+            if store
+            else InMemoryCalendarStore()
+        )
 
     @property
     def store_service(self) -> CalendarListStoreService:
         """Return the local API for fetching events."""
         return CalendarListStoreService(self._store)
+
+    @property
+    def api(self) -> GoogleCalendarService:
+        """Return the cloud API."""
+        return self._api
 
     async def run(self) -> None:
         """Run the event sync manager."""
@@ -124,14 +135,19 @@ class CalendarEventSyncManager:
     """Manages synchronizing events from API to local store."""
 
     def __init__(
-        self, api: GoogleCalendarService, calendar_id: str, store: CalendarStore
+        self,
+        api: GoogleCalendarService,
+        calendar_id: str,
+        store: CalendarStore | None = None,
     ) -> None:
         """Initialize CalendarEventSyncManager."""
         self._api = api
-        self._store = ScopedCalendarStore(
-            ScopedCalendarStore(store, EVENT_SYNC), calendar_id
-        )
         self._calendar_id = calendar_id
+        self._store = (
+            ScopedCalendarStore(ScopedCalendarStore(store, EVENT_SYNC), calendar_id)
+            if store
+            else InMemoryCalendarStore()
+        )
 
     @property
     def store_service(self) -> CalendarEventStoreService:

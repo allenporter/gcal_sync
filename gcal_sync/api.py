@@ -95,7 +95,6 @@ class _ListEventsResponseModel(SyncableResponse):
     """Api response containing a list of events."""
 
     items: List[Event] = []
-    timezone: Optional[str] = Field(default=None, alias="timeZone")
 
 
 class ListEventsResponse:
@@ -125,11 +124,6 @@ class ListEventsResponse:
     def page_token(self) -> str | None:
         """Return the page token in the response."""
         return self._model.page_token
-
-    @property
-    def timezone(self) -> str | None:
-        """Return the timezone in the response."""
-        return self._model.timezone
 
     async def __aiter__(self) -> AsyncIterator[ListEventsResponse]:
         """Async iterator to traverse through pages of responses."""
@@ -197,7 +191,7 @@ class GoogleCalendarService:
     ) -> _ListEventsResponseModel:
         """Return the list of events."""
         params = {
-            "maxResult": EVENT_PAGE_SIZE,
+            "maxResults": EVENT_PAGE_SIZE,
             "singleEvents": "true",
             "orderBy": "startTime",
             "fields": EVENT_API_FIELDS,
