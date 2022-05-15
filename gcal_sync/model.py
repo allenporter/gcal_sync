@@ -89,14 +89,26 @@ class VisibilityEnum(str, Enum):
     PRIVATE = "private"  # Same as confidential
 
 
+class ResponseStatus(str, Enum):
+    """The attendee's response status."""
+
+    NEEDS_ACTION = "needsAction"
+    DECLINED = "declined"
+    TENTATIVE = "tentative"
+    ACCEPTED = "accepted"
+
+
 class Attendee(BaseModel):
     """An attendee of an event."""
 
     id: Optional[str] = None
     email: str = ""
-    displayName: Optional[str] = None
+    display_name: Optional[str] = Field(alias="displayName", default=None)
     optional: bool = False
     comment: Optional[str] = None
+    response_status: ResponseStatus = Field(
+        alias="responseStatus", default=ResponseStatus.NEEDS_ACTION
+    )
 
 
 class Event(BaseModel):
