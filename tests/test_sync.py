@@ -17,6 +17,10 @@ from gcal_sync.sync import VERSION, CalendarEventSyncManager, CalendarListSyncMa
 from .conftest import ApiResult, ResponseResult
 
 CALENDAR_ID = "some-calendar-id"
+EVENT_LIST_PARAMS = (
+    "maxResults=100&singleEvents=true&orderBy=startTime"
+    f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+)
 
 
 @pytest.fixture(name="store")
@@ -216,8 +220,7 @@ async def test_event_lookup_items(
     sync = await event_sync_manager_cb()
     await sync.run()
     assert url_request() == [
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-03-08T00:31:02"
     ]
 
@@ -347,11 +350,9 @@ async def test_event_sync_date_pages(
     sync = await event_sync_manager_cb()
     await sync.run()
     assert url_request() == [
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-03-08T00:31:02",
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
     ]
 
@@ -375,14 +376,11 @@ async def test_event_sync_date_pages(
     )
     await sync.run()
     assert url_request() == [
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-03-08T00:31:02",
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&syncToken=sync-token-1",
     ]
 
@@ -438,11 +436,9 @@ async def test_event_sync_datetime_pages(
     sync = await event_sync_manager_cb()
     await sync.run()
     assert url_request() == [
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-03-08T00:31:02",
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
     ]
 
@@ -466,14 +462,11 @@ async def test_event_sync_datetime_pages(
     )
     await sync.run()
     assert url_request() == [
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-03-08T00:31:02",
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&syncToken=sync-token-1",
     ]
 
@@ -521,8 +514,7 @@ async def test_event_invalidated_sync_token(
     sync = await event_sync_manager_cb()
     await sync.run()
     assert url_request() == [
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-03-08T00:31:02"
     ]
 
@@ -566,11 +558,9 @@ async def test_event_invalidated_sync_token(
     )
     await sync.run()
     assert url_request() == [
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS}"
-        ")&syncToken=sync-token-1",
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
+        "&syncToken=sync-token-1",
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-03-08T00:31:02",
     ]
     result = await sync.store_service.async_list_events(LocalListEventsRequest())
@@ -617,8 +607,7 @@ async def test_event_token_version_invalidation(
     sync = await event_sync_manager_cb()
     await sync.run()
     assert url_request() == [
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-03-08T00:31:02"
     ]
 
@@ -651,8 +640,7 @@ async def test_event_token_version_invalidation(
         await sync.run()
 
     assert url_request() == [
-        "/calendars/some-calendar-id/events?maxResult=100&singleEvents=true&orderBy=startTime"
-        f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-03-08T00:31:02"
     ]
     result = await sync.store_service.async_list_events(LocalListEventsRequest())

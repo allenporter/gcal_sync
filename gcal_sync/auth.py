@@ -46,7 +46,7 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
         headers = {AUTHORIZATION_HEADER: f"Bearer {access_token}"}
         if not (url.startswith("http://") or url.startswith("https://")):
             url = f"{self._host}/{url}"
-        _LOGGER.debug("request[%s]=%s", method, url)
+        _LOGGER.debug("request[%s]=%s %s", method, url, kwargs.get("params"))
         if method == "post" and "json" in kwargs:
             _LOGGER.debug("request[post json]=%s", kwargs["json"])
         return await self._websession.request(method, url, **kwargs, headers=headers)
