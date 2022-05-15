@@ -12,6 +12,7 @@ from gcal_sync.model import (
     Event,
     EventStatusEnum,
     EventTypeEnum,
+    ResponseStatus,
     VisibilityEnum,
 )
 
@@ -436,21 +437,35 @@ def test_attendees() -> None:
                     "id": "attendee-id-2",
                     "email": "example2@example.com",
                     "displayName": "Example 2",
+                    "responseStatus": "accepted",
+                },
+                {
+                    "id": "attendee-id-3",
+                    "email": "example3@example.com",
+                    "displayName": "Example 3",
+                    "responseStatus": "declined",
                 },
             ],
         }
     )
-    assert len(event.attendees) == 2
     assert event.attendees == [
         Attendee(
             id="attendee-id-1",
             email="example1@example.com",
             displayName="Example 1",
             comment="comment 1",
+            responseStatus=ResponseStatus.NEEDS_ACTION,
         ),
         Attendee(
             id="attendee-id-2",
             email="example2@example.com",
             displayName="Example 2",
+            responseStatus=ResponseStatus.ACCEPTED,
+        ),
+        Attendee(
+            id="attendee-id-3",
+            email="example3@example.com",
+            displayName="Example 3",
+            responseStatus=ResponseStatus.DECLINED,
         ),
     ]
