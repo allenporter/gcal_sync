@@ -37,6 +37,24 @@ def test_calendar() -> None:
     assert calendar.timezone is None
 
 
+def test_calendar_timezone() -> None:
+    """Exercise basic parsing of a calendar API response."""
+
+    calendar = Calendar.parse_obj(
+        {
+            "kind": "calendar#calendarListEntry",
+            "id": "some-calendar-id",
+            "summary": "Calendar summary",
+            "timeZone": "America/Los_Angeles",
+        }
+    )
+    assert calendar.id == "some-calendar-id"
+    assert calendar.summary == "Calendar summary"
+    assert calendar.description is None
+    assert calendar.location is None
+    assert calendar.timezone == "America/Los_Angeles"
+
+
 def test_event_with_date() -> None:
     """Exercise basic parsing of an event API response."""
 
