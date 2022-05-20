@@ -23,7 +23,9 @@ EVENT_PAGE_SIZE = 100
 # pylint: disable=line-too-long
 EVENT_API_FIELDS = f"kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 
+CALENDAR_ID = "calendarId"
 CALENDAR_LIST_URL = "users/me/calendarList"
+CALENDAR_GET_URL = "calendars/{calendar_id}"
 CALENDAR_EVENTS_URL = "calendars/{calendar_id}/events"
 
 
@@ -153,9 +155,15 @@ class GoogleCalendarService:
         params = {}
         if request:
             params = json.loads(request.json(exclude_none=True, by_alias=True))
-        _LOGGER.debug(params)
         result = await self._auth.get_json(CALENDAR_LIST_URL, params=params)
         return CalendarListResponse.parse_obj(result)
+
+    async def async_get_calendar(self, calendar_id: str) -> Calendar:
+        """Return the calendar with the specified id."""
+        result = await self._auth.get_json(
+            CALENDAR_GET_URL.format(calendar_id=calendar_id)
+        )
+        return Calendar.parse_obj(result)
 
     async def async_create_event(
         self,

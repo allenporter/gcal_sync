@@ -16,6 +16,26 @@ EVENT_LIST_PARAMS = (
 )
 
 
+async def test_get_calendar(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test list calendars API."""
+
+    json_response(
+        {
+            "id": "calendar-id-1",
+            "summary": "Calendar 1",
+        },
+    )
+    calendar_service = await calendar_service_cb()
+    result = await calendar_service.async_get_calendar("primary")
+    assert result == Calendar(id="calendar-id-1", summary="Calendar 1")
+
+    assert url_request() == ["/calendars/primary"]
+
+
 async def test_list_calendars(
     calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
     json_response: ApiResult,
