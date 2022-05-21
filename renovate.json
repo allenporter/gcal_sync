@@ -2,5 +2,13 @@
   "extends": [
     "config:base"
   ],
-  "assignees": ["allenporter"]
+  "assignees": ["allenporter"],
+  "packageRules": [
+    {
+      "description": "Minor updates are automatic",
+      "automerge": true,
+      "automergeType": "branch",
+      "matchUpdateTypes": ["minor", "patch"]
+    }
+  ]
 }
