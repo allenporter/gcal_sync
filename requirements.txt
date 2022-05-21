@@ -6,7 +6,7 @@ flake8-black==0.3.2
 flake8==4.0.1
 freezegun==1.2.1
 mypy==0.950
-pre-commit==2.18.1
+pre-commit==2.19.0
 pydantic==1.9.0
 pylint==2.13.8
 pytest==7.1.2
