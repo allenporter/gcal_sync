@@ -8,7 +8,7 @@ freezegun==1.2.1
 mypy==0.961
 pre-commit==2.19.0
 pydantic==1.9.1
-pylint==2.14.0
+pylint==2.14.1
 pytest==7.1.2
 pytest-aiohttp==1.0.4
 pytest-asyncio==0.18.3
