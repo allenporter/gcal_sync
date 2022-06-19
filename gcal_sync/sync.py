@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
@@ -40,7 +41,7 @@ def _items_func(
     for item in result.items:
         if not item.id:
             continue
-        items[item.id] = item
+        items[item.id] = json.loads(item.json())
     return items
 
 
