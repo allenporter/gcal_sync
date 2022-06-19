@@ -1,7 +1,11 @@
 """Tests for event sync library."""
 
+from __future__ import annotations
+
 import datetime
+import json
 from collections.abc import Awaitable, Callable
+from typing import Any, cast
 from unittest.mock import patch
 
 import aiohttp
@@ -23,9 +27,30 @@ EVENT_LIST_PARAMS = (
 )
 
 
-@pytest.fixture(name="store")
-def fake_store() -> CalendarStore:
-    """Fixture for a calendar store."""
+class JsonStore(CalendarStore):
+    """Store that asserts objects can be serialized as json."""
+
+    def __init__(self) -> None:
+        self._data = "{}"
+
+    async def async_load(self) -> dict[str, Any] | None:
+        """Load data."""
+        return cast(dict[str, Any], json.loads(self._data))
+
+    async def async_save(self, data: dict[str, Any]) -> None:
+        """Save data."""
+        self._data = json.dumps(data)
+
+
+@pytest.fixture(
+    name="store",
+    params=["json", "in-memory"],
+    ids=["json-store", "in-memory-store"],
+)
+def fake_store(request: Any) -> CalendarStore:
+    """Fixture that sets up the configuration used for the test."""
+    if request.param == "json":
+        return JsonStore()
     return InMemoryCalendarStore()
 
 
@@ -102,7 +127,7 @@ async def test_list_calendars(
     ]
 
 
-async def test_list_calendars_pagess(
+async def test_list_calendars_pages(
     calendar_list_sync_manager_cb: Callable[[], Awaitable[CalendarListSyncManager]],
     json_response: ApiResult,
     url_request: Callable[[], str],
