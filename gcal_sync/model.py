@@ -29,10 +29,10 @@ class Calendar(BaseModel):
 class DateOrDatetime(BaseModel):
     """A date or datetime."""
 
-    date: Optional[datetime.date]
-    date_time: Optional[datetime.datetime] = Field(alias="dateTime")
+    date: Optional[datetime.date] = Field(default=None)
+    date_time: Optional[datetime.datetime] = Field(alias="dateTime", default=None)
     # Note: timezone is only used for creating new events
-    timezone: Optional[str] = Field(alias="timeZone")
+    timezone: Optional[str] = Field(alias="timeZone", default=None)
 
     @property
     def value(self) -> Union[datetime.date, datetime.datetime]:
