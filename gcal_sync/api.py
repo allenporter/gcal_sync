@@ -78,7 +78,7 @@ class ListEventsRequest(SyncableRequest):
     """Api request to list events."""
 
     calendar_id: str = Field(alias="calendarId")
-    start_time: datetime.datetime = Field(default=None, alias="timeMin")
+    start_time: Optional[datetime.datetime] = Field(default=None, alias="timeMin")
     end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
     search: Optional[str] = Field(default=None, alias="q")
 
