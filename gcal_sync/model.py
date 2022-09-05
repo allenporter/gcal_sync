@@ -23,7 +23,7 @@ class Calendar(BaseModel):
     summary: str = ""
     description: Optional[str]
     location: Optional[str]
-    timezone: Optional[str] = Field(alias="timeZone")
+    timezone: Optional[str] = Field(alias="timeZone", default=None)
 
 
 class DateOrDatetime(BaseModel):
