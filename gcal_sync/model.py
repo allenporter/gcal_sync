@@ -128,7 +128,7 @@ class Event(BaseModel):
     event_type: EventTypeEnum = Field(alias="eventType", default=EventTypeEnum.DEFAULT)
     visibility: VisibilityEnum = VisibilityEnum.DEFAULT
     attendees: list[Attendee] = []
-    attendeesOmitted: bool = False
+    attendees_omitted: bool = Field(alias="attendeesOmitted", default=False)
 
     @root_validator(pre=True)
     def allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
