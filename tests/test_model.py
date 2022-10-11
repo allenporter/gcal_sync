@@ -487,3 +487,29 @@ def test_attendees() -> None:
             responseStatus=ResponseStatus.DECLINED,
         ),
     ]
+
+
+def test_recurring_event() -> None:
+    """Test fields set for a recurring event."""
+
+    event = Event.parse_obj(
+        {
+            "id": "a0033414ffas_20221012",
+            "summary": "Event summary",
+            "start": {
+                "date": "2022-10-12",
+            },
+            "end": {
+                "date": "2022-10-13",
+            },
+            "recurringEventId": "a0033414ffas",
+            "originalStartTime": {"date": "2022-10-12"},
+            "iCalUID": "a0033414ffas@google.com",
+        }
+    )
+    assert event.id == "a0033414ffas_20221012"
+    assert event.summary == "Event summary"
+    assert event.recurring_event_id == "a0033414ffas"
+    assert event.original_start_time
+    assert event.original_start_time.date == datetime.date(2022, 10, 12)
+    assert event.ical_uuid == "a0033414ffas@google.com"

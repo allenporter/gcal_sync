@@ -115,6 +115,7 @@ class Event(BaseModel):
     """A single event on a calendar."""
 
     id: Optional[str] = None
+    ical_uuid: Optional[str] = Field(alias="iCalUID", default=None)
     summary: str = ""
     start: DateOrDatetime
     end: DateOrDatetime
@@ -129,6 +130,11 @@ class Event(BaseModel):
     visibility: VisibilityEnum = VisibilityEnum.DEFAULT
     attendees: list[Attendee] = []
     attendees_omitted: bool = Field(alias="attendeesOmitted", default=False)
+    recurrence: list[str] = []
+    recurring_event_id: Optional[str] = Field(alias="recurringEventId", default=None)
+    original_start_time: Optional[DateOrDatetime] = Field(
+        alias="originalStartTime", default=None
+    )
 
     @root_validator(pre=True)
     def allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
