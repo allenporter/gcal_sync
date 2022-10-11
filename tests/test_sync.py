@@ -21,6 +21,7 @@ from gcal_sync.sync import VERSION, CalendarEventSyncManager, CalendarListSyncMa
 from .conftest import ApiResult, ResponseResult
 
 CALENDAR_ID = "some-calendar-id"
+SYNC_TIME = "2006-01-01T00:00:00%2B00:00"
 EVENT_LIST_PARAMS = (
     "maxResults=100&singleEvents=true&orderBy=startTime"
     f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
@@ -246,7 +247,7 @@ async def test_event_lookup_items(
     await sync.run()
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-03-08T00:31:02"
+        f"&timeMin={SYNC_TIME}"
     ]
 
     result = await sync.store_service.async_list_events(
@@ -376,9 +377,9 @@ async def test_event_sync_date_pages(
     await sync.run()
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-03-08T00:31:02",
+        f"&timeMin={SYNC_TIME}",
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
+        f"&pageToken=page-token-1&timeMin={SYNC_TIME}",
     ]
 
     json_response(
@@ -402,9 +403,9 @@ async def test_event_sync_date_pages(
     await sync.run()
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-03-08T00:31:02",
+        f"&timeMin={SYNC_TIME}",
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
+        f"&pageToken=page-token-1&timeMin={SYNC_TIME}",
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&syncToken=sync-token-1",
     ]
@@ -462,9 +463,9 @@ async def test_event_sync_datetime_pages(
     await sync.run()
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-03-08T00:31:02",
+        f"&timeMin={SYNC_TIME}",
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
+        f"&pageToken=page-token-1&timeMin={SYNC_TIME}",
     ]
 
     json_response(
@@ -488,9 +489,9 @@ async def test_event_sync_datetime_pages(
     await sync.run()
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-03-08T00:31:02",
+        f"&timeMin={SYNC_TIME}",
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&pageToken=page-token-1&timeMin=2022-03-08T00:31:02",
+        f"&pageToken=page-token-1&timeMin={SYNC_TIME}",
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&syncToken=sync-token-1",
     ]
@@ -540,7 +541,7 @@ async def test_event_invalidated_sync_token(
     await sync.run()
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-03-08T00:31:02"
+        f"&timeMin={SYNC_TIME}"
     ]
 
     result = await sync.store_service.async_list_events(LocalListEventsRequest())
@@ -586,7 +587,7 @@ async def test_event_invalidated_sync_token(
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&syncToken=sync-token-1",
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-03-08T00:31:02",
+        f"&timeMin={SYNC_TIME}",
     ]
     result = await sync.store_service.async_list_events(LocalListEventsRequest())
     assert result.events == [
@@ -633,7 +634,7 @@ async def test_event_token_version_invalidation(
     await sync.run()
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-03-08T00:31:02"
+        f"&timeMin={SYNC_TIME}"
     ]
 
     result = await sync.store_service.async_list_events(LocalListEventsRequest())
@@ -666,7 +667,7 @@ async def test_event_token_version_invalidation(
 
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-03-08T00:31:02"
+        f"&timeMin={SYNC_TIME}"
     ]
     result = await sync.store_service.async_list_events(LocalListEventsRequest())
     assert len(result.events) == 1

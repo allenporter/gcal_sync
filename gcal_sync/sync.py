@@ -28,7 +28,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # Can be incremented to blow away existing store
 VERSION = 1
-
+MIN_SYNC_DATETIME = datetime.datetime(2006, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
 
 T = TypeVar("T", bound=SyncableRequest)
 S = TypeVar("S", bound=SyncableResponse)
@@ -169,10 +169,7 @@ class CalendarEventSyncManager:
                 _LOGGER.debug(
                     "Performing full calendar sync for calendar %s", self._calendar_id
                 )
-                # Sync at most 4 weeks of prior events
-                request.start_time = datetime.datetime.now() - datetime.timedelta(
-                    days=28
-                )
+                request.start_time = MIN_SYNC_DATETIME
             else:
                 _LOGGER.debug(
                     "Performing incremental sync for calendar %s (%s)",
