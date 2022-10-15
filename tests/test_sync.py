@@ -13,7 +13,7 @@ import pytest
 from freezegun import freeze_time
 
 from gcal_sync.api import GoogleCalendarService, LocalListEventsRequest
-from gcal_sync.exceptions import ApiException
+from gcal_sync.exceptions import ApiException, InvalidSyncTokenException
 from gcal_sync.model import EVENT_FIELDS, Calendar, DateOrDatetime, Event
 from gcal_sync.store import CalendarStore, InMemoryCalendarStore
 from gcal_sync.sync import VERSION, CalendarEventSyncManager, CalendarListSyncManager
@@ -117,7 +117,8 @@ async def test_list_calendars(
                     "id": "calendar-id-2",
                     "summary": "Calendar 2",
                 },
-            ]
+            ],
+            "nextSyncToken": "example-token",
         }
     )
     sync = await calendar_list_sync_manager_cb()
@@ -197,7 +198,7 @@ async def test_event_sync_failure(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     response: ResponseResult,
 ) -> None:
-    """Test list calendars API."""
+    """Test failure response when syncing."""
 
     response(aiohttp.web.Response(status=500))
 
@@ -242,7 +243,8 @@ async def test_event_lookup_items(
                     },
                     "transparency": "opaque",
                 },
-            ]
+            ],
+            "nextSyncToken": "example-token",
         }
     )
 
@@ -823,3 +825,35 @@ async def test_event_sync_recover_failure(
         Calendar(id="calendar-id-1", summary="Calendar 1"),
         Calendar(id="calendar-id-2", summary="Calendar 2"),
     ]
+
+
+async def test_event_sync_invalid_api_response(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+) -> None:
+    """Test lookup events API."""
+
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "summary": "Event 1",
+                    "description": "Event description 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                    "transparency": "transparent",
+                },
+            ],
+            # No nextSyncToken
+        }
+    )
+
+    sync = await event_sync_manager_cb()
+    with pytest.raises(InvalidSyncTokenException):
+        await sync.run()

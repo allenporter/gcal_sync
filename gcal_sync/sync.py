@@ -79,6 +79,10 @@ async def _run_sync(
         store_data[ITEMS].update(items_func(result))
 
         if not result.page_token:
+            if not result.sync_token:
+                raise InvalidSyncTokenException(
+                    "Unexpected API response, missing sync_token"
+                )
             store_data[SYNC_TOKEN] = result.sync_token
             store_data[SYNC_TOKEN_VERSION] = VERSION
             break
