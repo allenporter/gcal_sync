@@ -117,11 +117,8 @@ class SyncEventsRequest(ListEventsRequest):
         request = _RawListEventsRequest(
             **json.loads(self.json(exclude_none=True, by_alias=True))
         )
-        _LOGGER.info("to_request")
         if not request.sync_token:
-            _LOGGER.info("no sync token")
             request.single_events = Boolean.TRUE
-        _LOGGER.info("values=%s", request.json())
         return request
 
     @validator("start_time", always=True)

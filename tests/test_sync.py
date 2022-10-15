@@ -12,7 +12,11 @@ import aiohttp
 import pytest
 from freezegun import freeze_time
 
-from gcal_sync.api import GoogleCalendarService, LocalListEventsRequest
+from gcal_sync.api import (
+    GoogleCalendarService,
+    LocalListEventsRequest,
+    SyncEventsRequest,
+)
 from gcal_sync.exceptions import ApiException, InvalidSyncTokenException
 from gcal_sync.model import EVENT_FIELDS, Calendar, DateOrDatetime, Event
 from gcal_sync.store import CalendarStore, InMemoryCalendarStore
@@ -831,8 +835,7 @@ async def test_event_sync_invalid_api_response(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
 ) -> None:
-    """Test lookup events API."""
-
+    """Test invalid server api response during sync."""
     json_response(
         {
             "items": [
@@ -857,3 +860,67 @@ async def test_event_sync_invalid_api_response(
     sync = await event_sync_manager_cb()
     with pytest.raises(InvalidSyncTokenException):
         await sync.run()
+
+
+async def test_event_sync_with_search(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    store: CalendarStore,
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+    request_reset: Callable[[], str],
+) -> None:
+    """Test syncing events with a search string."""
+    service = await calendar_service_cb()
+    sync = CalendarEventSyncManager(
+        service,
+        store=store,
+        request_template=SyncEventsRequest(calendar_id=CALENDAR_ID, search="trash"),
+    )
+
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "summary": "Event 1",
+                    "description": "Event description 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                    "transparency": "transparent",
+                },
+            ],
+            "nextSyncToken": "sync-token-1",
+        },
+    )
+    await sync.run()
+    assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}&q=trash"
+    ]
+    request_reset()
+
+    json_response(
+        {
+            "items": [],
+            "nextSyncToken": "sync-token-2",
+        },
+    )
+    await sync.run()
+    assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}"
+        "&syncToken=sync-token-1"
+    ]
+
+
+async def test_sync_required_fields(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    store: CalendarStore,
+) -> None:
+    """Test syncing events with a search string."""
+    service = await calendar_service_cb()
+    with pytest.raises(ValueError):
+        CalendarEventSyncManager(service, store=store)

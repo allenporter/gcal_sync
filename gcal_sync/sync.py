@@ -143,14 +143,23 @@ class CalendarEventSyncManager:
     def __init__(
         self,
         api: GoogleCalendarService,
-        calendar_id: str,
+        calendar_id: str | None = None,
         store: CalendarStore | None = None,
+        request_template: SyncEventsRequest | None = None,
     ) -> None:
         """Initialize CalendarEventSyncManager."""
         self._api = api
-        self._calendar_id = calendar_id
+        if request_template is None:
+            if not calendar_id:
+                raise ValueError("Required either calendar_id or request_template")
+            self._request_template = SyncEventsRequest(calendar_id=calendar_id)
+        else:
+            self._request_template = request_template
+        self._calendar_id = self._request_template.calendar_id
         self._store = (
-            ScopedCalendarStore(ScopedCalendarStore(store, EVENT_SYNC), calendar_id)
+            ScopedCalendarStore(
+                ScopedCalendarStore(store, EVENT_SYNC), self._calendar_id
+            )
             if store
             else InMemoryCalendarStore()
         )
@@ -169,19 +178,19 @@ class CalendarEventSyncManager:
         """Run the event sync manager."""
 
         def new_request(sync_token: str | None) -> ListEventsRequest:
-            request = SyncEventsRequest(calendar_id=self._calendar_id)
             if not sync_token:
                 _LOGGER.debug(
                     "Performing full calendar sync for calendar %s", self._calendar_id
                 )
-            else:
-                _LOGGER.debug(
-                    "Performing incremental sync for calendar %s (%s)",
-                    self._calendar_id,
-                    sync_token,
-                )
-                request.sync_token = sync_token
-            return request
+                return self._request_template.copy()
+            _LOGGER.debug(
+                "Performing incremental sync for calendar %s (%s)",
+                self._calendar_id,
+                sync_token,
+            )
+            return self._request_template.copy(
+                include={"calendar_id"}, update={"sync_token": sync_token}
+            )
 
         store_data = await self._store.async_load() or {}
         store_data = await _run_sync(
