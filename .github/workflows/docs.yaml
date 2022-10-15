@@ -26,7 +26,7 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Create docs
-        run: pdocs ./gcal_sync -o docs/
+        run: pdoc ./gcal_sync -o docs/
 
       - name: Upload docs
         uses: actions/upload-pages-artifact@v1
