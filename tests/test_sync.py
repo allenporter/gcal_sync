@@ -899,7 +899,7 @@ async def test_event_sync_with_search(
     )
     await sync.run()
     assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}" f"&q=trash"
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}&q=trash"
     ]
     request_reset()
 
