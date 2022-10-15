@@ -117,7 +117,8 @@ async def test_list_calendars(
                     "id": "calendar-id-2",
                     "summary": "Calendar 2",
                 },
-            ]
+            ],
+            "nextSyncToken": "example-token",
         }
     )
     sync = await calendar_list_sync_manager_cb()
@@ -242,7 +243,8 @@ async def test_event_lookup_items(
                     },
                     "transparency": "opaque",
                 },
-            ]
+            ],
+            "nextSyncToken": "example-token",
         }
     )
 
