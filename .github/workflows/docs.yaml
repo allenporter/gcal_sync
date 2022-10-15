@@ -1,4 +1,4 @@
-ame: website
+name: website
 
 # build the documentation whenever there are new commits on main
 on:
