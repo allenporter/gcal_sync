@@ -23,8 +23,11 @@ from .conftest import ApiResult, ResponseResult
 CALENDAR_ID = "some-calendar-id"
 SYNC_TIME = "2006-01-01T00:00:00%2B00:00"
 EVENT_LIST_PARAMS = (
-    "maxResults=100&singleEvents=true&orderBy=startTime"
+    "maxResults=100&singleEvents=true"
     f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+)
+EVENT_PAGE_PARAMS = (
+    f"maxResults=100&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 )
 
 
@@ -245,10 +248,7 @@ async def test_event_lookup_items(
 
     sync = await event_sync_manager_cb()
     await sync.run()
-    assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&timeMin={SYNC_TIME}"
-    ]
+    assert url_request() == [f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"]
 
     result = await sync.store_service.async_list_events(
         LocalListEventsRequest(
@@ -330,6 +330,7 @@ async def test_event_sync_date_pages(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
     url_request: Callable[[], str],
+    request_reset: Callable[[], str],
 ) -> None:
     """Test lookup events API."""
 
@@ -376,11 +377,11 @@ async def test_event_sync_date_pages(
     sync = await event_sync_manager_cb()
     await sync.run()
     assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}",
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&timeMin={SYNC_TIME}",
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&pageToken=page-token-1&timeMin={SYNC_TIME}",
+        f"&pageToken=page-token-1",
     ]
+    request_reset()
 
     json_response(
         {
@@ -402,11 +403,7 @@ async def test_event_sync_date_pages(
     )
     await sync.run()
     assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&timeMin={SYNC_TIME}",
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&pageToken=page-token-1&timeMin={SYNC_TIME}",
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
+        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}"
         "&syncToken=sync-token-1",
     ]
 
@@ -416,6 +413,7 @@ async def test_event_sync_datetime_pages(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
     url_request: Callable[[], str],
+    request_reset: Callable[[], str],
 ) -> None:
     """Test lookup events API."""
 
@@ -462,11 +460,11 @@ async def test_event_sync_datetime_pages(
     sync = await event_sync_manager_cb()
     await sync.run()
     assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}",
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&timeMin={SYNC_TIME}",
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&pageToken=page-token-1&timeMin={SYNC_TIME}",
+        f"&pageToken=page-token-1",
     ]
+    request_reset()
 
     json_response(
         {
@@ -488,11 +486,7 @@ async def test_event_sync_datetime_pages(
     )
     await sync.run()
     assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&timeMin={SYNC_TIME}",
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&pageToken=page-token-1&timeMin={SYNC_TIME}",
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
+        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}"
         "&syncToken=sync-token-1",
     ]
 
@@ -539,10 +533,7 @@ async def test_event_invalidated_sync_token(
 
     sync = await event_sync_manager_cb()
     await sync.run()
-    assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&timeMin={SYNC_TIME}"
-    ]
+    assert url_request() == [f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"]
 
     result = await sync.store_service.async_list_events(LocalListEventsRequest())
     assert result.events == [
@@ -584,10 +575,9 @@ async def test_event_invalidated_sync_token(
     )
     await sync.run()
     assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
+        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}"
         "&syncToken=sync-token-1",
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&timeMin={SYNC_TIME}",
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}",
     ]
     result = await sync.store_service.async_list_events(LocalListEventsRequest())
     assert result.events == [
@@ -632,10 +622,7 @@ async def test_event_token_version_invalidation(
     )
     sync = await event_sync_manager_cb()
     await sync.run()
-    assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&timeMin={SYNC_TIME}"
-    ]
+    assert url_request() == [f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"]
 
     result = await sync.store_service.async_list_events(LocalListEventsRequest())
     assert len(result.events) == 1
@@ -665,10 +652,7 @@ async def test_event_token_version_invalidation(
     with patch("gcal_sync.sync.VERSION", VERSION + 1):
         await sync.run()
 
-    assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&timeMin={SYNC_TIME}"
-    ]
+    assert url_request() == [f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"]
     result = await sync.store_service.async_list_events(LocalListEventsRequest())
     assert len(result.events) == 1
     assert result.events[0].id == "some-event-id-2"
@@ -786,6 +770,7 @@ async def test_event_sync_recover_failure(
     json_response: ApiResult,
     response: ResponseResult,
     url_request: Callable[[], str],
+    request_reset: Callable[[], str],
 ) -> None:
     """Test list calendars API."""
     json_response(
@@ -810,6 +795,7 @@ async def test_event_sync_recover_failure(
         "/users/me/calendarList",
         "/users/me/calendarList?syncToken=sync-token-1",
     ]
+    request_reset()
 
     result = await sync.store_service.async_list_calendars()
     assert result.calendars == [
@@ -830,8 +816,6 @@ async def test_event_sync_recover_failure(
 
     await sync.run()
     assert url_request() == [
-        "/users/me/calendarList",
-        "/users/me/calendarList?syncToken=sync-token-1",
         "/users/me/calendarList?syncToken=sync-token-1",
     ]
     result = await sync.store_service.async_list_calendars()
