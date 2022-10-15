@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import datetime
+import enum
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 from urllib.request import pathname2url
 
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, root_validator, validator
 
 from .auth import AbstractAuth
 from .const import ITEMS
@@ -82,10 +83,110 @@ class ListEventsRequest(SyncableRequest):
     end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
     search: Optional[str] = Field(default=None, alias="q")
 
+    def to_request(self) -> _RawListEventsRequest:
+        """Convert to the raw API request for sending to the API."""
+        return _RawListEventsRequest(
+            **json.loads(self.json(exclude_none=True, by_alias=True)),
+            single_events=Boolean.TRUE,
+            order_by=OrderBy.START_TIME,
+        )
+
+    @validator("start_time", always=True)
+    def default_start_time(cls, value: datetime.datetime | None) -> datetime.datetime:
+        """Select a default start time value of not specified."""
+        if value is None:
+            return now()
+        return value
+
     @root_validator
     def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Validate the date or datetime fields are set properly."""
         return _validate_datetimes(values)
+
+    class Config:
+        """Model configuration."""
+
+        allow_population_by_field_name = True
+
+
+class SyncEventsRequest(ListEventsRequest):
+    """Api request to list events when used in the context of sync."""
+
+    def to_request(self) -> _RawListEventsRequest:
+        """Disables default value behavior."""
+        request = _RawListEventsRequest(
+            **json.loads(self.json(exclude_none=True, by_alias=True))
+        )
+        _LOGGER.info("to_request")
+        if not request.sync_token:
+            _LOGGER.info("no sync token")
+            request.single_events = Boolean.TRUE
+        _LOGGER.info("values=%s", request.json())
+        return request
+
+    @validator("start_time", always=True)
+    def default_start_time(cls, value: datetime.datetime) -> datetime.datetime:
+        """Disables default value behavior."""
+        return value
+
+
+class OrderBy(str, enum.Enum):
+    """Represents the order of events returned."""
+
+    START_TIME = "startTime"
+    UPDATED = "updated"
+
+
+class Boolean(str, enum.Enum):
+    "Hack to support custom json encoding in pydantic." ""
+
+    TRUE = "true"
+    FALSE = "false"
+
+
+class _RawListEventsRequest(BaseModel):
+    """Api request to list events."""
+
+    calendar_id: str = Field(alias="calendarId")
+    max_results: int = Field(default=EVENT_PAGE_SIZE, alias="maxResults")
+    single_events: Optional[Boolean] = Field(alias="singleEvents")
+    order_by: Optional[OrderBy] = Field(alias="orderBy")
+    fields: str = Field(default=EVENT_API_FIELDS)
+    page_token: Optional[str] = Field(default=None, alias="pageToken")
+    sync_token: Optional[str] = Field(default=None, alias="syncToken")
+    start_time: Optional[datetime.datetime] = Field(default=None, alias="timeMin")
+    end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
+    search: Optional[str] = Field(default=None, alias="q")
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return the object as a json dict."""
+        return cast(
+            dict[str, Any],
+            json.loads(
+                self.json(exclude_none=True, by_alias=True, exclude={"calendar_id"})
+            ),
+        )
+
+    @root_validator
+    def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Validate the date or datetime fields are set properly."""
+        return _validate_datetimes(values)
+
+    @root_validator
+    def check_sync_token_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Validate the set of fields present when using a sync token."""
+        if not values.get("sync_token"):
+            return values
+        if (
+            values.get("order_by")
+            or values.get("search")
+            or values.get("time_min")
+            or values.get("time_max")
+        ):
+            raise ValueError(
+                f"Specified request params not compatible with sync_token: {values}"
+            )
+        return values
 
     class Config:
         """Model configuration."""
@@ -198,19 +299,7 @@ class GoogleCalendarService:
         request: ListEventsRequest,
     ) -> _ListEventsResponseModel:
         """Return the list of events."""
-        params = {
-            "maxResults": EVENT_PAGE_SIZE,
-            "singleEvents": "true",
-            "orderBy": "startTime",
-            "fields": EVENT_API_FIELDS,
-        }
-        if not request.start_time and not request.sync_token:
-            request.start_time = now()
-        params.update(
-            json.loads(
-                request.json(exclude_none=True, by_alias=True, exclude={"calendar_id"})
-            )
-        )
+        params = request.to_request().as_dict()
         result = await self._auth.get_json(
             CALENDAR_EVENTS_URL.format(calendar_id=pathname2url(request.calendar_id)),
             params=params,

@@ -17,6 +17,7 @@ from .api import (
     ListEventsRequest,
     SyncableRequest,
     SyncableResponse,
+    SyncEventsRequest,
     _ListEventsResponseModel,
 )
 from .const import CALENDAR_LIST_SYNC, EVENT_SYNC, ITEMS, SYNC_TOKEN, SYNC_TOKEN_VERSION
@@ -164,12 +165,11 @@ class CalendarEventSyncManager:
         """Run the event sync manager."""
 
         def new_request(sync_token: str | None) -> ListEventsRequest:
-            request = ListEventsRequest(calendar_id=self._calendar_id)
+            request = SyncEventsRequest(calendar_id=self._calendar_id)
             if not sync_token:
                 _LOGGER.debug(
                     "Performing full calendar sync for calendar %s", self._calendar_id
                 )
-                request.start_time = MIN_SYNC_DATETIME
             else:
                 _LOGGER.debug(
                     "Performing incremental sync for calendar %s (%s)",
