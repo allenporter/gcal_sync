@@ -125,6 +125,56 @@ def test_iteration(timeline: Timeline) -> None:
     ]
 
 
+def test_date_and_datetimes() -> None:
+    """Test chronological iteration of a timeline with all day and non-all day events."""
+    timeline = calendar_timeline(
+        [
+            Event.parse_obj(
+                {
+                    "id": "some-event-id-2",
+                    "summary": "second",
+                    "start": {
+                        "date": "2000-2-1",
+                    },
+                    "end": {
+                        "date": "2000-2-2",
+                    },
+                }
+            ),
+            Event.parse_obj(
+                {
+                    "id": "some-event-id-1",
+                    "summary": "first",
+                    "start": {
+                        "dateTime": "2000-01-01T12:00:00Z",
+                    },
+                    "end": {
+                        "dateTime": "2000-01-01T12:30:00Z",
+                    },
+                },
+            ),
+            Event.parse_obj(
+                {
+                    "id": "some-event-id-3",
+                    "summary": "third",
+                    "start": {
+                        "date": "2000-3-1",
+                    },
+                    "end": {
+                        "date": "2000-3-2",
+                    },
+                },
+            ),
+        ]
+    )
+
+    assert [e.summary for e in timeline] == [
+        "first",
+        "second",
+        "third",
+    ]
+
+
 @pytest.mark.parametrize(
     "when,expected_events",
     [

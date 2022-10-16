@@ -116,7 +116,7 @@ class EventIterable(Iterable[Event]):
         for event in iter(self._iterable):
             if event.recurrence:
                 continue
-            heapq.heappush(heap, (event.start.value, event))
+            heapq.heappush(heap, (event.start.normalize, event))
         while heap:
             (_, event) = heapq.heappop(heap)
             yield event
