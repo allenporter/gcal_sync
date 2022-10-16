@@ -45,11 +45,16 @@ class Timeline(Iterable[Event]):
         """
         timespan = Event(summary="", start=start, end=end)
         for event in self:
-            _LOGGER.debug("testing event: %s vs %s", event, timespan)
             if event.intersects(timespan):
                 yield event
             elif event > timespan:
                 break
+
+    def start_after(self, instant: DateOrDatetime) -> Iterator[Event]:
+        """Return an iterator containing events starting after the specified time."""
+        for event in self:
+            if event.start > instant:
+                yield event
 
     def active_after(
         self,
@@ -107,11 +112,13 @@ class EventIterable(Iterable[Event]):
         # Using a heap is faster than sorting if the number of events (n) is
         # much bigger than the number of events we extract from the iterator (k).
         # Complexity: O(n + k log n).
+        _LOGGER.debug("EventIterable start")
         heap: list[tuple[datetime.date | datetime.datetime, Event]] = []
         for event in iter(self._iterable):
             if event.recurrence:
                 continue
             heapq.heappush(heap, (event.start.value, event))
+        _LOGGER.debug("EventIterable ready to iterate")
         while heap:
             (_, event) = heapq.heappop(heap)
             yield event
@@ -154,11 +161,6 @@ def calendar_timeline(events: list[Event]) -> Timeline:
     for event in events:
         if not event.recurrence:
             continue
-        ruleset = rrule.rruleset()
-        for recur in event.recurrence:
-            parsed = rrule.rrulestr(recur, dtstart=event.start.value)
-            if not isinstance(parsed, rrule.rrule):
-                raise ValueError("Unexpected rrule parse value")
-            ruleset.rrule(parsed)
+        ruleset = rrule.rrulestr("\n".join(event.recurrence), dtstart=event.start.value)
         iters.append(RecurIterable(RecurAdapter(event).get, ruleset))
     return Timeline(MergedIterable(iters))
