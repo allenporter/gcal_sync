@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import datetime
+import zoneinfo
 
 import pytest
 from freezegun import freeze_time
 
 from gcal_sync.model import DateOrDatetime, Event
 from gcal_sync.timeline import Timeline, calendar_timeline
+from gcal_sync.util import use_local_timezone
 
 
 @pytest.fixture(name="timeline")
@@ -186,12 +188,12 @@ def test_today(calendar_times: Timeline) -> None:
 
 
 @pytest.mark.parametrize(
-    "start,end,rrule,expected",
+    "start,end,rrules,expected",
     [
         (
             datetime.date(2022, 8, 1),
             datetime.date(2022, 8, 2),
-            "RRULE:FREQ=DAILY;UNTIL=20220804",
+            ["RRULE:FREQ=DAILY;UNTIL=20220804"],
             [
                 (datetime.date(2022, 8, 1), datetime.date(2022, 8, 2)),
                 (datetime.date(2022, 8, 2), datetime.date(2022, 8, 3)),
@@ -202,7 +204,7 @@ def test_today(calendar_times: Timeline) -> None:
         (
             datetime.date(2022, 8, 1),
             datetime.date(2022, 8, 2),
-            "RRULE:FREQ=DAILY;UNTIL=20220804;INTERVAL=2",
+            ["RRULE:FREQ=DAILY;UNTIL=20220804;INTERVAL=2"],
             [
                 (datetime.date(2022, 8, 1), datetime.date(2022, 8, 2)),
                 (datetime.date(2022, 8, 3), datetime.date(2022, 8, 4)),
@@ -211,7 +213,7 @@ def test_today(calendar_times: Timeline) -> None:
         (
             datetime.date(2022, 8, 1),
             datetime.date(2022, 8, 2),
-            "RRULE:FREQ=DAILY;COUNT=3",
+            ["RRULE:FREQ=DAILY;COUNT=3"],
             [
                 (datetime.date(2022, 8, 1), datetime.date(2022, 8, 2)),
                 (datetime.date(2022, 8, 2), datetime.date(2022, 8, 3)),
@@ -221,7 +223,7 @@ def test_today(calendar_times: Timeline) -> None:
         (
             datetime.date(2022, 8, 1),
             datetime.date(2022, 8, 2),
-            "RRULE:FREQ=DAILY;INTERVAL=2;COUNT=3",
+            ["RRULE:FREQ=DAILY;INTERVAL=2;COUNT=3"],
             [
                 (datetime.date(2022, 8, 1), datetime.date(2022, 8, 2)),
                 (datetime.date(2022, 8, 3), datetime.date(2022, 8, 4)),
@@ -229,9 +231,21 @@ def test_today(calendar_times: Timeline) -> None:
             ],
         ),
         (
+            datetime.date(2022, 8, 1),
+            datetime.date(2022, 8, 2),
+            [
+                "EXDATE;VALUE=DATE:20220803",
+                "RRULE:FREQ=DAILY;INTERVAL=2;COUNT=3",
+            ],
+            [
+                (datetime.date(2022, 8, 1), datetime.date(2022, 8, 2)),
+                (datetime.date(2022, 8, 5), datetime.date(2022, 8, 6)),
+            ],
+        ),
+        (
             datetime.datetime(2022, 8, 1, 9, 30, 0),
             datetime.datetime(2022, 8, 1, 10, 0, 0),
-            "RRULE:FREQ=DAILY;UNTIL=20220804T093000",
+            ["RRULE:FREQ=DAILY;UNTIL=20220804T093000"],
             [
                 (
                     datetime.datetime(2022, 8, 1, 9, 30, 0),
@@ -256,7 +270,7 @@ def test_today(calendar_times: Timeline) -> None:
 def test_day_iteration(
     start: datetime.datetime | datetime.date,
     end: datetime.datetime | datetime.date,
-    rrule: str,
+    rrules: list[str],
     expected: list[tuple[datetime.date, datetime.date]],
 ) -> None:
     """Test recurrence rules for day frequency."""
@@ -264,7 +278,52 @@ def test_day_iteration(
         summary="summary",
         start=DateOrDatetime.parse(start),
         end=DateOrDatetime.parse(end),
-        recurrence=[rrule],
+        recurrence=rrules,
     )
     timeline = calendar_timeline([event])
     assert [(e.start.value, e.end.value) for e in timeline] == expected
+
+
+@pytest.mark.parametrize(
+    "tzname,dt_before,dt_after",
+    [
+        (
+            "America/Los_Angeles",  # UTC-8 in Feb
+            datetime.datetime(2000, 2, 1, 7, 59, 59, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2000, 2, 1, 8, 0, 0, tzinfo=datetime.timezone.utc),
+        ),
+        (
+            "America/Regina",  # UTC-6 all year round
+            datetime.datetime(2000, 2, 1, 5, 59, 59, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2000, 2, 1, 6, 0, 0, tzinfo=datetime.timezone.utc),
+        ),
+        (
+            "CET",  # UTC-1 in Feb
+            datetime.datetime(2000, 1, 31, 22, 59, 59, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2000, 1, 31, 23, 0, 0, tzinfo=datetime.timezone.utc),
+        ),
+    ],
+)
+def test_all_day_with_local_timezone(
+    tzname: str, dt_before: datetime.datetime, dt_after: datetime.datetime
+) -> None:
+    """Test iteration of all day events using local timezone override."""
+    timeline = calendar_timeline(
+        [
+            Event(
+                summary="event",
+                start=DateOrDatetime(date=datetime.date(2000, 2, 1)),
+                end=DateOrDatetime(date=datetime.date(2000, 2, 2)),
+            ),
+        ]
+    )
+
+    def start_after(dtstart: datetime.datetime) -> list[str]:
+        nonlocal timeline
+        return [
+            e.summary for e in timeline.start_after(DateOrDatetime(date_time=dtstart))
+        ]
+
+    with use_local_timezone(zoneinfo.ZoneInfo(tzname)):
+        assert start_after(dt_before) == ["event"]
+        assert not start_after(dt_after)
