@@ -16,7 +16,7 @@ from .auth import AbstractAuth
 from .const import ITEMS
 from .model import EVENT_FIELDS, Calendar, DateOrDatetime, Event, EventStatusEnum
 from .store import CalendarStore
-from .timeline import calendar_timeline
+from .timeline import Timeline, calendar_timeline
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -371,20 +371,8 @@ class CalendarEventStoreService:
     ) -> LocalListEventsResponse:
         """Return the set of events matching the criteria."""
 
-        store_data = await self._store.async_load() or {}
-        store_data.setdefault(ITEMS, {})
-        events_data = store_data.get(ITEMS, {})
-        _LOGGER.debug("Event store contains %d events", len(events_data))
+        timeline = await self.async_get_timeline()
 
-        events: list[Event] = []
-        for data in events_data.values():
-            event = Event.parse_obj(data)
-            if event.status == EventStatusEnum.CANCELLED:
-                continue
-            events.append(event)
-
-        timeline = calendar_timeline(events)
-        DateOrDatetime(date_time=request.start_time)
         if request.end_time:
             return LocalListEventsResponse(
                 events=list(
@@ -399,3 +387,19 @@ class CalendarEventStoreService:
                 timeline.active_after(DateOrDatetime(date_time=request.start_time))
             )
         )
+
+    async def async_get_timeline(self) -> Timeline:
+        """Get the timeline of events."""
+        store_data = await self._store.async_load() or {}
+        store_data.setdefault(ITEMS, {})
+        events_data = store_data.get(ITEMS, {})
+        _LOGGER.debug("Created timeline of %d events", len(events_data))
+
+        events: list[Event] = []
+        for data in events_data.values():
+            event = Event.parse_obj(data)
+            if event.status == EventStatusEnum.CANCELLED:
+                continue
+            events.append(event)
+
+        return calendar_timeline(events)
