@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import datetime
-import json
 from collections.abc import Awaitable, Callable
-from typing import Any, cast
 from unittest.mock import patch
 
 import aiohttp
@@ -19,75 +17,18 @@ from gcal_sync.api import (
 )
 from gcal_sync.exceptions import ApiException, InvalidSyncTokenException
 from gcal_sync.model import EVENT_FIELDS, Calendar, DateOrDatetime, Event
-from gcal_sync.store import CalendarStore, InMemoryCalendarStore
+from gcal_sync.store import CalendarStore
 from gcal_sync.sync import VERSION, CalendarEventSyncManager, CalendarListSyncManager
 
-from .conftest import ApiResult, ResponseResult
+from .conftest import CALENDAR_ID, ApiResult, ResponseResult
 
-CALENDAR_ID = "some-calendar-id"
 SYNC_TIME = "2006-01-01T00:00:00%2B00:00"
 EVENT_LIST_PARAMS = (
-    "maxResults=100&singleEvents=true"
-    f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+    f"maxResults=100&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 )
 EVENT_PAGE_PARAMS = (
     f"maxResults=100&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 )
-
-
-class JsonStore(CalendarStore):
-    """Store that asserts objects can be serialized as json."""
-
-    def __init__(self) -> None:
-        self._data = "{}"
-
-    async def async_load(self) -> dict[str, Any] | None:
-        """Load data."""
-        return cast(dict[str, Any], json.loads(self._data))
-
-    async def async_save(self, data: dict[str, Any]) -> None:
-        """Save data."""
-        self._data = json.dumps(data)
-
-
-@pytest.fixture(
-    name="store",
-    params=["json", "in-memory"],
-    ids=["json-store", "in-memory-store"],
-)
-def fake_store(request: Any) -> CalendarStore:
-    """Fixture that sets up the configuration used for the test."""
-    if request.param == "json":
-        return JsonStore()
-    return InMemoryCalendarStore()
-
-
-@pytest.fixture(name="calendar_list_sync_manager_cb")
-def fake_calendar_list_sync_manager(
-    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
-    store: CalendarStore,
-) -> Callable[[], Awaitable[CalendarListSyncManager]]:
-    """Fixture for an event sync manager."""
-
-    async def func() -> CalendarListSyncManager:
-        service = await calendar_service_cb()
-        return CalendarListSyncManager(service, store)
-
-    return func
-
-
-@pytest.fixture(name="event_sync_manager_cb")
-def fake_event_sync_manager(
-    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
-    store: CalendarStore,
-) -> Callable[[], Awaitable[CalendarEventSyncManager]]:
-    """Fixture for an event sync manager."""
-
-    async def func() -> CalendarEventSyncManager:
-        service = await calendar_service_cb()
-        return CalendarEventSyncManager(service, CALENDAR_ID, store)
-
-    return func
 
 
 async def test_calendar_list_sync_failure(
@@ -706,7 +647,7 @@ async def test_canceled_events(
     await sync.run()
     result = await sync.store_service.async_list_events(
         LocalListEventsRequest(
-            start_time=datetime.datetime.fromisoformat("0001-01-01T00:00:00"),
+            start_time=datetime.datetime.fromisoformat("2001-01-01T00:00:00"),
         )
     )
     assert result.events == [
@@ -750,7 +691,7 @@ async def test_canceled_events(
     await sync.run()
     result = await sync.store_service.async_list_events(
         LocalListEventsRequest(
-            start_time=datetime.datetime.fromisoformat("0001-01-01T00:00:00"),
+            start_time=datetime.datetime.fromisoformat("2001-01-01T00:00:00"),
         )
     )
     assert result.events == [

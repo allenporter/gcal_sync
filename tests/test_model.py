@@ -1,7 +1,10 @@
 """Tests for the data model."""
 
+from __future__ import annotations
+
 import datetime
 import json
+import zoneinfo
 
 import pytest
 from pydantic import ValidationError
@@ -9,12 +12,16 @@ from pydantic import ValidationError
 from gcal_sync.model import (
     Attendee,
     Calendar,
+    DateOrDatetime,
     Event,
     EventStatusEnum,
     EventTypeEnum,
     ResponseStatus,
     VisibilityEnum,
 )
+
+SUMMARY = "test summary"
+LOS_ANGELES = zoneinfo.ZoneInfo("America/Los_Angeles")
 
 
 def test_calendar() -> None:
@@ -513,3 +520,77 @@ def test_recurring_event() -> None:
     assert event.original_start_time
     assert event.original_start_time.date == datetime.date(2022, 10, 12)
     assert event.ical_uuid == "a0033414ffas@google.com"
+
+
+@pytest.mark.parametrize(
+    "event1_start,event1_end,event2_start,event2_end",
+    [
+        (
+            datetime.date(2022, 9, 6),
+            datetime.date(2022, 9, 7),
+            datetime.date(2022, 9, 8),
+            datetime.date(2022, 9, 10),
+        ),
+        (
+            datetime.datetime(2022, 9, 6, 6, 0, 0),
+            datetime.datetime(2022, 9, 6, 7, 0, 0),
+            datetime.datetime(2022, 9, 6, 8, 0, 0),
+            datetime.datetime(2022, 9, 6, 8, 30, 0),
+        ),
+        (
+            datetime.datetime(2022, 9, 6, 6, 0, 0, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2022, 9, 6, 7, 0, 0, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2022, 9, 6, 8, 0, 0, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2022, 9, 6, 8, 30, 0, tzinfo=datetime.timezone.utc),
+        ),
+        (
+            datetime.datetime(2022, 9, 6, 6, 0, 0, tzinfo=LOS_ANGELES),
+            datetime.datetime(2022, 9, 6, 7, 0, 0, tzinfo=LOS_ANGELES),
+            datetime.datetime(2022, 9, 7, 8, 0, 0, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2022, 9, 7, 8, 30, 0, tzinfo=datetime.timezone.utc),
+        ),
+        (
+            datetime.datetime(2022, 9, 6, 6, 0, 0, tzinfo=LOS_ANGELES),
+            datetime.datetime(2022, 9, 6, 7, 0, 0, tzinfo=LOS_ANGELES),
+            datetime.datetime(2022, 9, 8, 8, 0, 0),
+            datetime.datetime(2022, 9, 8, 8, 30, 0),
+        ),
+        (
+            datetime.datetime(2022, 9, 6, 6, 0, 0, tzinfo=LOS_ANGELES),
+            datetime.datetime(2022, 9, 6, 7, 0, 0, tzinfo=LOS_ANGELES),
+            datetime.date(2022, 9, 8),
+            datetime.date(2022, 9, 9),
+        ),
+        (
+            datetime.date(2022, 9, 6),
+            datetime.date(2022, 9, 7),
+            datetime.datetime(2022, 9, 6, 8, 0, 0, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2022, 9, 6, 8, 30, 0, tzinfo=datetime.timezone.utc),
+        ),
+    ],
+)
+def test_comparisons(
+    event1_start: datetime.datetime | datetime.date,
+    event1_end: datetime.datetime | datetime.date,
+    event2_start: datetime.datetime | datetime.date,
+    event2_end: datetime.datetime | datetime.date,
+) -> None:
+    """Test event comparison methods."""
+    event1 = Event(
+        summary=SUMMARY,
+        start=DateOrDatetime.parse(event1_start),
+        end=DateOrDatetime.parse(event1_end),
+    )
+    event2 = Event(
+        summary=SUMMARY,
+        start=DateOrDatetime.parse(event2_start),
+        end=DateOrDatetime.parse(event2_end),
+    )
+    assert event1 < event2
+    assert event1 <= event2
+    assert event2 >= event1
+    assert event2 > event1
+
+    assert event1 <= event2
+    assert event2 >= event1
+    assert event2 > event1

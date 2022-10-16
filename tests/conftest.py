@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Awaitable, Callable
 from json import JSONDecodeError
 from typing import Any, Generator, List, TypeVar, cast
@@ -12,6 +13,11 @@ from aiohttp.test_utils import TestClient
 
 from gcal_sync.api import GoogleCalendarService
 from gcal_sync.auth import AbstractAuth
+from gcal_sync.store import CalendarStore, InMemoryCalendarStore
+from gcal_sync.sync import CalendarEventSyncManager, CalendarListSyncManager
+
+CALENDAR_ID = "some-calendar-id"
+
 
 ResponseResult = Callable[[aiohttp.web.Response], None]
 ApiResult = Callable[[dict[str, Any]], None]
@@ -37,9 +43,9 @@ class RefreshingAuth(AbstractAuth):
     async def async_get_access_token(self) -> str:
         resp = await self._websession.request("get", "/refresh-auth")
         resp.raise_for_status()
-        json = await resp.json()
-        assert isinstance(json["token"], str)
-        return json["token"]
+        json_value = await resp.json()
+        assert isinstance(json_value["token"], str)
+        return json_value["token"]
 
 
 @pytest.fixture(name="event_loop")
@@ -190,3 +196,58 @@ def mock_json_request(app: aiohttp.web.Application) -> ApiRequest:
         return cast(List[dict[str, Any]], app["request-json"])
 
     return _get_request
+
+
+class JsonStore(CalendarStore):
+    """Store that asserts objects can be serialized as json."""
+
+    def __init__(self) -> None:
+        self._data = "{}"
+
+    async def async_load(self) -> dict[str, Any] | None:
+        """Load data."""
+        return cast(dict[str, Any], json.loads(self._data))
+
+    async def async_save(self, data: dict[str, Any]) -> None:
+        """Save data."""
+        self._data = json.dumps(data)
+
+
+@pytest.fixture(
+    name="store",
+    params=["json", "in-memory"],
+    ids=["json-store", "in-memory-store"],
+)
+def fake_store(request: Any) -> CalendarStore:
+    """Fixture that sets up the configuration used for the test."""
+    if request.param == "json":
+        return JsonStore()
+    return InMemoryCalendarStore()
+
+
+@pytest.fixture(name="calendar_list_sync_manager_cb")
+def fake_calendar_list_sync_manager(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    store: CalendarStore,
+) -> Callable[[], Awaitable[CalendarListSyncManager]]:
+    """Fixture for an event sync manager."""
+
+    async def func() -> CalendarListSyncManager:
+        service = await calendar_service_cb()
+        return CalendarListSyncManager(service, store)
+
+    return func
+
+
+@pytest.fixture(name="event_sync_manager_cb")
+def fake_event_sync_manager(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    store: CalendarStore,
+) -> Callable[[], Awaitable[CalendarEventSyncManager]]:
+    """Fixture for an event sync manager."""
+
+    async def func() -> CalendarEventSyncManager:
+        service = await calendar_service_cb()
+        return CalendarEventSyncManager(service, CALENDAR_ID, store)
+
+    return func

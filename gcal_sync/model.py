@@ -9,10 +9,12 @@ from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field, root_validator
 
+from .util import MIDNIGHT, local_timezone
+
 DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
     "id,summary,description,location,start,end,transparency,eventType,"
-    "visibility,attendees,attendeesOmitted"
+    "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime"
 )
 
 
@@ -34,6 +36,13 @@ class DateOrDatetime(BaseModel):
     # Note: timezone is only used for creating new events
     timezone: Optional[str] = Field(alias="timeZone", default=None)
 
+    @classmethod
+    def parse(cls, value: datetime.date | datetime.datetime) -> DateOrDatetime:
+        """Create a DateOrDatetime from a raw date or datetime value."""
+        if isinstance(value, datetime.datetime):
+            return cls(date_time=value)
+        return cls(date=value)
+
     @property
     def value(self) -> Union[datetime.date, datetime.datetime]:
         """Return either a datetime or date representing the Datetime."""
@@ -44,6 +53,36 @@ class DateOrDatetime(BaseModel):
                 return self.date_time.replace(tzinfo=zoneinfo.ZoneInfo(self.timezone))
             return self.date_time
         raise ValueError("Datetime has invalid state with no date or date_time")
+
+    @property
+    def normalize(self) -> datetime.datetime:
+        """Convert date or datetime to a value that can be used for comparison."""
+        value = self.value
+        if not isinstance(value, datetime.datetime):
+            value = datetime.datetime.combine(value, MIDNIGHT)
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=local_timezone())
+        return value
+
+    def __lt__(self, other: Any) -> bool:
+        if not isinstance(other, DateOrDatetime):
+            return NotImplemented
+        return self.normalize < other.normalize
+
+    def __gt__(self, other: Any) -> bool:
+        if not isinstance(other, DateOrDatetime):
+            return NotImplemented
+        return self.normalize > other.normalize
+
+    def __le__(self, other: Any) -> bool:
+        if not isinstance(other, DateOrDatetime):
+            return NotImplemented
+        return self.normalize <= other.normalize
+
+    def __ge__(self, other: Any) -> bool:
+        if not isinstance(other, DateOrDatetime):
+            return NotImplemented
+        return self.normalize >= other.normalize
 
     @root_validator
     def check_date_or_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
@@ -136,6 +175,11 @@ class Event(BaseModel):
         alias="originalStartTime", default=None
     )
 
+    @property
+    def computed_duration(self) -> datetime.timedelta:
+        """Return the event duration."""
+        return self.end.value - self.start.value
+
     @root_validator(pre=True)
     def allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Special case for canceled event tombstones that are missing required fields."""
@@ -154,6 +198,44 @@ class Event(BaseModel):
             if visibility == "confidential":
                 values["visibility"] = "private"
         return values
+
+    def intersects(self, other: "Event") -> bool:
+        """Return True if this event overlaps with the other event."""
+        return (
+            other.start <= self.start < other.end
+            or other.start < self.end <= other.end
+            or self.start <= other.start < self.end
+            or self.start < other.end <= self.end
+        )
+
+    def includes(self, other: "Event") -> bool:
+        """Return True if the other event starts and ends within this event."""
+        return (
+            self.start <= other.start < self.end and self.start <= other.end < self.end
+        )
+
+    def _tuple(self) -> tuple[datetime.datetime, datetime.datetime]:
+        return (self.start.normalize, self.end.normalize)
+
+    def __lt__(self, other: Any) -> bool:
+        if not isinstance(other, Event):
+            return NotImplemented
+        return self._tuple() < other._tuple()
+
+    def __gt__(self, other: Any) -> bool:
+        if not isinstance(other, Event):
+            return NotImplemented
+        return self._tuple() > other._tuple()
+
+    def __le__(self, other: Any) -> bool:
+        if not isinstance(other, Event):
+            return NotImplemented
+        return self._tuple() <= other._tuple()
+
+    def __ge__(self, other: Any) -> bool:
+        if not isinstance(other, Event):
+            return NotImplemented
+        return self._tuple() >= other._tuple()
 
     class Config:
         """Model configuration."""

@@ -39,4 +39,10 @@ The database should have two indexes to serve the above queries:
 
 Additionally, the database needs to support insert, update, delete to support the sync APIs.
 
+Syncing all events as single events denormalized causes extreme bloat on a
+calendar (e.g. megabytes of data related to duplicate copies of the same
+events over and over with different timestamps). As a result, the local
+sync database will instead sync a single event and handle recurrence rules
+on local queries.
+
 TODO: Can the list of calendars also be sync'd?

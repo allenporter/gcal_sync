@@ -14,8 +14,9 @@ from pydantic import BaseModel, Field, root_validator, validator
 
 from .auth import AbstractAuth
 from .const import ITEMS
-from .model import EVENT_FIELDS, Calendar, Event, EventStatusEnum
+from .model import EVENT_FIELDS, Calendar, DateOrDatetime, Event, EventStatusEnum
 from .store import CalendarStore
+from .timeline import calendar_timeline
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -110,16 +111,19 @@ class ListEventsRequest(SyncableRequest):
 
 
 class SyncEventsRequest(ListEventsRequest):
-    """Api request to list events when used in the context of sync."""
+    """Api request to list events when used in the context of sync.
+
+    This differs from a normal ListEventsRequest in that it handles differences between
+    initial sync and follow up syncs with a sync token (which has fewer fields allowed). This
+    also does not expand recurring events into single events since the local event store
+    handles this.
+    """
 
     def to_request(self) -> _RawListEventsRequest:
         """Disables default value behavior."""
-        request = _RawListEventsRequest(
+        return _RawListEventsRequest(
             **json.loads(self.json(exclude_none=True, by_alias=True))
         )
-        if not request.sync_token:
-            request.single_events = Boolean.TRUE
-        return request
 
     @validator("start_time", always=True)
     def default_start_time(cls, value: datetime.datetime) -> datetime.datetime:
@@ -370,27 +374,28 @@ class CalendarEventStoreService:
         store_data = await self._store.async_load() or {}
         store_data.setdefault(ITEMS, {})
         events_data = store_data.get(ITEMS, {})
+        _LOGGER.debug("Event store contains %d events", len(events_data))
 
-        events = []
-        for event_data in events_data.values():
-            event = Event.parse_obj(event_data)
+        events: list[Event] = []
+        for data in events_data.values():
+            event = Event.parse_obj(data)
             if event.status == EventStatusEnum.CANCELLED:
                 continue
-            if request.start_time:
-                if event.end.date and request.start_time.date() > event.end.date:
-                    continue
-                if (
-                    isinstance(event.end.value, datetime.datetime)
-                    and request.start_time > event.end.value
-                ):
-                    continue
-            if request.end_time:
-                if event.start.date and request.end_time.date() < event.start.date:
-                    continue
-                if (
-                    isinstance(event.start.value, datetime.datetime)
-                    and request.end_time < event.start.value
-                ):
-                    continue
             events.append(event)
-        return LocalListEventsResponse(events=events)
+
+        timeline = calendar_timeline(events)
+        DateOrDatetime(date_time=request.start_time)
+        if request.end_time:
+            return LocalListEventsResponse(
+                events=list(
+                    timeline.overlapping(
+                        DateOrDatetime(date_time=request.start_time),
+                        DateOrDatetime(date_time=request.end_time),
+                    )
+                )
+            )
+        return LocalListEventsResponse(
+            events=list(
+                timeline.active_after(DateOrDatetime(date_time=request.start_time))
+            )
+        )
