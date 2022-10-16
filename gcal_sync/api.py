@@ -10,10 +10,11 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, List, Optional, cast
 from urllib.request import pathname2url
 
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, ValidationError, root_validator, validator
 
 from .auth import AbstractAuth
 from .const import ITEMS
+from .exceptions import ApiException
 from .model import EVENT_FIELDS, Calendar, DateOrDatetime, Event, EventStatusEnum
 from .store import CalendarStore
 from .timeline import Timeline, calendar_timeline
@@ -306,7 +307,11 @@ class GoogleCalendarService:
             params=params,
         )
         _ListEventsResponseModel.update_forward_refs()
-        return _ListEventsResponseModel.parse_obj(result)
+        try:
+            return _ListEventsResponseModel.parse_obj(result)
+        except ValidationError as err:
+            _LOGGER.debug("Unable to parse result: %s", result)
+            raise ApiException("Error parsing API response") from err
 
 
 class LocalCalendarListResponse(BaseModel):
