@@ -112,13 +112,11 @@ class EventIterable(Iterable[Event]):
         # Using a heap is faster than sorting if the number of events (n) is
         # much bigger than the number of events we extract from the iterator (k).
         # Complexity: O(n + k log n).
-        _LOGGER.debug("EventIterable start")
         heap: list[tuple[datetime.date | datetime.datetime, Event]] = []
         for event in iter(self._iterable):
             if event.recurrence:
                 continue
             heapq.heappush(heap, (event.start.value, event))
-        _LOGGER.debug("EventIterable ready to iterate")
         while heap:
             (_, event) = heapq.heappop(heap)
             yield event

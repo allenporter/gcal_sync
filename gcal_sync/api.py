@@ -393,7 +393,7 @@ class CalendarEventStoreService:
         store_data = await self._store.async_load() or {}
         store_data.setdefault(ITEMS, {})
         events_data = store_data.get(ITEMS, {})
-        _LOGGER.debug("Event store contains %d events", len(events_data))
+        _LOGGER.debug("Created timeline of %d events", len(events_data))
 
         events: list[Event] = []
         for data in events_data.values():
