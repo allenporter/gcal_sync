@@ -140,6 +140,38 @@ def test_on_date(
     assert [e.summary for e in timeline.on_date(when)] == expected_events
 
 
+@pytest.mark.parametrize(
+    "start,end,expected_events",
+    [
+        (datetime.date(2000, 2, 3), datetime.date(2000, 2, 4), []),
+        (datetime.date(2000, 1, 31), datetime.date(2000, 2, 2), ["second"]),
+        (
+            datetime.datetime(2000, 1, 31, 12, 0),
+            datetime.datetime(2000, 2, 2, 12, 00),
+            ["second"],
+        ),
+        (
+            datetime.datetime(2000, 2, 1, 12, 0),
+            datetime.datetime(2000, 2, 1, 12, 30),
+            ["second"],
+        ),
+    ],
+)
+def test_overlap(
+    timeline: Timeline,
+    start: datetime.date | datetime.datetime,
+    end: datetime.date | datetime.datetime,
+    expected_events: list[str],
+) -> None:
+    """Test returning events on a particular day."""
+    assert [
+        e.summary
+        for e in timeline.overlapping(
+            DateOrDatetime.parse(start), DateOrDatetime.parse(end)
+        )
+    ] == expected_events
+
+
 def test_active_after(timeline: Timeline) -> None:
     """Test returning events on a particular day."""
     events = [
