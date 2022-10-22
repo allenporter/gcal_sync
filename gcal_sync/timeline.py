@@ -12,8 +12,6 @@ import heapq
 import logging
 from collections.abc import Iterable, Iterator
 
-from dateutil import rrule
-
 from .iter import MergedIterable, RecurIterable
 from .model import DateOrDatetime, Event
 
@@ -159,6 +157,5 @@ def calendar_timeline(events: list[Event]) -> Timeline:
     for event in events:
         if not event.recurrence:
             continue
-        ruleset = rrule.rrulestr("\n".join(event.recurrence), dtstart=event.start.value)
-        iters.append(RecurIterable(RecurAdapter(event).get, ruleset))
+        iters.append(RecurIterable(RecurAdapter(event).get, event.rrule))
     return Timeline(MergedIterable(iters))

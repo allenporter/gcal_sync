@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import zoneinfo
+from itertools import islice
 
 import pytest
 from freezegun import freeze_time
@@ -409,3 +410,73 @@ def test_all_day_with_local_timezone(
     with use_local_timezone(zoneinfo.ZoneInfo(tzname)):
         assert start_after(dt_before) == ["event"]
         assert not start_after(dt_after)
+
+
+def test_invalid_rrule_until_datetime() -> None:
+    """Test recurrence rule with mismatched UNTIL value from google api."""
+    event = Event.parse_obj(
+        {
+            "summary": "Summary",
+            "start": {"date": "2012-11-27"},
+            "end": {"date": "2012-11-28"},
+            "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20130225T000000Z;BYDAY=TU"],
+        }
+    )
+    timeline = calendar_timeline([event])
+    assert [(e.start.value, e.end.value) for e in islice(timeline, 3)] == [
+        (datetime.date(2012, 11, 27), datetime.date(2012, 11, 28)),
+        (datetime.date(2012, 12, 4), datetime.date(2012, 12, 5)),
+        (datetime.date(2012, 12, 11), datetime.date(2012, 12, 12)),
+    ]
+
+
+def test_invalid_rrule_until_date() -> None:
+    """Test recurrence rule with mismatched UNTIL value from google api."""
+    event = Event.parse_obj(
+        {
+            "summary": "Summary",
+            "start": {"date_time": "2020-07-06T18:00:00-07:00"},
+            "end": {"date_time": "2020-07-06T22:00:00-07:00"},
+            "recurrence": ["RRULE:FREQ=DAILY;UNTIL=20200915"],
+        }
+    )
+    timeline = calendar_timeline([event])
+    tzinfo = datetime.timezone(datetime.timedelta(hours=-7))
+    assert [(e.start.value, e.end.value) for e in islice(timeline, 3)] == [
+        (
+            datetime.datetime(2020, 7, 6, 18, 0, tzinfo=tzinfo),
+            datetime.datetime(2020, 7, 6, 22, 0, tzinfo=tzinfo),
+        ),
+        (
+            datetime.datetime(2020, 7, 7, 18, 0, tzinfo=tzinfo),
+            datetime.datetime(2020, 7, 7, 22, 0, tzinfo=tzinfo),
+        ),
+        (
+            datetime.datetime(2020, 7, 8, 18, 0, tzinfo=tzinfo),
+            datetime.datetime(2020, 7, 8, 22, 0, tzinfo=tzinfo),
+        ),
+    ]
+
+
+def test_invalid_rrule_until_local_datetime() -> None:
+    """Test recurrence rule with mismatched UNTIL value from google api."""
+    event = Event.parse_obj(
+        {
+            "summary": "Summary",
+            "start": {"date_time": "2012-11-27T18:00:00"},
+            "end": {"date_time": "2012-11-27T19:00:00"},
+            "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20130225T000000Z;BYDAY=TU"],
+        }
+    )
+    timeline = calendar_timeline([event])
+    assert [(e.start.value, e.end.value) for e in islice(timeline, 3)] == [
+        (
+            datetime.datetime(2012, 11, 27, 18, 0),
+            datetime.datetime(2012, 11, 27, 19, 0),
+        ),
+        (datetime.datetime(2012, 12, 4, 18, 0), datetime.datetime(2012, 12, 4, 19, 0)),
+        (
+            datetime.datetime(2012, 12, 11, 18, 0),
+            datetime.datetime(2012, 12, 11, 19, 0),
+        ),
+    ]

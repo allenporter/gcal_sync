@@ -594,3 +594,31 @@ def test_comparisons(
     assert event1 <= event2
     assert event2 >= event1
     assert event2 > event1
+
+
+def test_invalid_rrule_until_format() -> None:
+    """Test invalid RRULE parsing."""
+    with pytest.raises(
+        ValidationError, match=r"Recurrence rule had unexpected format.*"
+    ):
+        Event.parse_obj(
+            {
+                "summary": "Summary",
+                "start": {"date_time": "2012-11-27T18:00:00"},
+                "end": {"date_time": "2012-11-27T19:00:00"},
+                "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL;BYDAY=TU"],
+            }
+        )
+
+
+def test_invalid_rrule_until_time() -> None:
+    """Test invalid RRULE parsing."""
+    with pytest.raises(ValidationError, match=r"Recurrence rule had invalid UNTIL.*"):
+        Event.parse_obj(
+            {
+                "summary": "Summary",
+                "start": {"date_time": "2012-11-27T18:00:00"},
+                "end": {"date_time": "2012-11-27T19:00:00"},
+                "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20220202T1234T;BYDAY=TU"],
+            }
+        )
