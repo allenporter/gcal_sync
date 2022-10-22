@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import zoneinfo
 from enum import Enum
 from typing import Any, Optional, Union
 
+from dateutil import rrule
 from pydantic import BaseModel, Field, root_validator
 
 from .util import MIDNIGHT, local_timezone
 
+_LOGGER = logging.getLogger(__name__)
+
 DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
-    "id,summary,description,location,start,end,transparency,eventType,"
+    "id,summary,description,location,start,end,transparency,status,eventType,"
     "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime"
 )
 
@@ -180,6 +184,16 @@ class Event(BaseModel):
         """Return the event duration."""
         return self.end.value - self.start.value
 
+    @property
+    def rrule(self) -> rrule.rrule | rrule.rruleset:
+        """Return the recurrence rules as a set of rules."""
+        try:
+            return rrule.rrulestr("\n".join(self.recurrence), dtstart=self.start.value)
+        except ValueError as err:
+            raise ValueError(
+                f"Invalid recurrence rule: {self.json()}: {str(err)}"
+            ) from err
+
     @root_validator(pre=True)
     def allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Special case for canceled event tombstones that are missing required fields."""
@@ -198,6 +212,63 @@ class Event(BaseModel):
             if visibility == "confidential":
                 values["visibility"] = "private"
         return values
+
+    @root_validator
+    def validate_rrule(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """The API returns invalid RRULEs that need to be coerced to valid."""
+        # Rules may need updating of start time has a timezone
+        if not (recurrence := values.get("recurrence")) or not (
+            dtstart := values.get("start")
+        ):
+            return values
+        _LOGGER.info("old=%s", values["recurrence"])
+        values["recurrence"] = [cls._adjust_rrule(rule, dtstart) for rule in recurrence]
+        _LOGGER.info("new=%s", values["recurrence"])
+        return values
+
+    @classmethod
+    def _adjust_rrule(cls, rule: str, dtstart: DateOrDatetime) -> str:
+        """Apply fixes to the rrule."""
+        if not rule.startswith("RRULE:"):
+            return rule
+
+        parts = {}
+        for part in rule[6:].split(";"):
+            if "=" not in part:
+                raise ValueError(
+                    f"Recurrence rule had unexpected format missing '=': {rule}"
+                )
+            key, value = part.split("=", 1)
+            key = key.upper()
+            parts[key.upper()] = value
+
+        if not (until := parts.get("UNTIL")):
+            return rule
+
+        until_parts = until.split("T")
+        if len(until_parts) > 2:
+            raise ValueError(f"Recurrence rule had invalid UNTIL: {rule}")
+
+        if dtstart.date_time:
+            if dtstart.date_time.tzinfo and len(until_parts) == 1:
+                # UNTIL is a DATE but must be a DATE-TIME
+                parts["UNTIL"] = f"{until}T000000Z"
+            elif dtstart.date_time.tzinfo is None and until_parts[1].endswith("Z"):
+                # Date should be floating
+                parts["UNTIL"] = f"{until_parts[0]}T{until_parts[1][:-1]}"
+        elif dtstart.date:
+            if len(until_parts) > 1:
+                # UNTIL is a DATE-TIME but must be a DATE
+                parts["UNTIL"] = until_parts[0]
+
+        rule = ";".join(f"{k}={v}" for k, v in parts.items())
+        try:
+            rrule.rrulestr(rule, dtstart=dtstart.value)
+        except ValueError as err:
+            raise ValueError(
+                f"Invalid recurrence rule {rule} for {dtstart}: {str(err)}"
+            ) from err
+        return rule
 
     def intersects(self, other: "Event") -> bool:
         """Return True if this event overlaps with the other event."""
