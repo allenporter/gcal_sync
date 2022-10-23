@@ -68,7 +68,6 @@ class DateOrDatetime(BaseModel):
             value = value.replace(tzinfo=(tzinfo if tzinfo else datetime.timezone.utc))
         return value
 
-    @root_validator
     def check_date_or_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Validate the date or datetime fields are set properly."""
         if not values.get("date") and not values.get("date_time"):
