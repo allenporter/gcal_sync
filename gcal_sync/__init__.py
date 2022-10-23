@@ -1,1 +1,14 @@
-"""Library for local sync of Google Calendar."""
+"""
+.. include:: ../README.md
+"""
+
+__all__ = [
+    "api",
+    "auth",
+    "exceptions",
+    "model",
+    "store",
+    "sync",
+    "timeline",
+    "timespan",
+]
