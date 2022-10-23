@@ -9,14 +9,11 @@ from __future__ import annotations
 
 import datetime
 import heapq
-import logging
 from collections.abc import Iterable, Iterator
 
 from .iter import MergedIterable, RecurIterable
 from .model import DateOrDatetime, Event
 from .timespan import Timespan
-
-_LOGGER = logging.getLogger(__name__)
 
 __all__ = ["Timeline"]
 
