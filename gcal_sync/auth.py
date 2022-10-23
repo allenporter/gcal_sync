@@ -10,7 +10,7 @@ An example implementation of `gcal_sync.AbstractAuth` would need to handle thing
 passin in the access token and any other necessary OAuth token refreshes when the
 access token has expired.
 
-```
+```python
 from gcal_sync.auth import AbstractAuth
 
 class MyAuthImpl(gcal_sync.AbstractAuth):

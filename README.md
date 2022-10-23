@@ -18,7 +18,7 @@ You will implement `gcal_sync.AbstractAuth` to provide an access token. Your imp
 will handle any necessary refreshes. You can invoke the service with your auth implentation
 to access the API.
 
-```
+```python
 from gcal_sync.auth import AbstractAuth
 
 
@@ -46,7 +46,7 @@ Events can be fetched using the `gcal_sync.api.ListEventsRequest` which can filt
 events based on time or search criteria. The `GoogleCalendarService` supports paging
 through events using an aync generator like in this example below:
 
-```
+```python
 from gcal_sync.api import ListEventsRequest
 
 request = ListEventsRequest(
@@ -70,7 +70,7 @@ first sync down the calendar then query local events. Any recurring events are
 expanded at query time by the local library by interpreting the recurrence rules
 on the synced event.
 
-```
+```python
 from gcal_sync.sync import CalendarListSyncManager
 
 sync = CalendarEventSyncManager(service)
