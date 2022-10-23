@@ -14,6 +14,7 @@ from collections.abc import Iterable, Iterator
 
 from .iter import MergedIterable, RecurIterable
 from .model import DateOrDatetime, Event
+from .timespan import Timespan
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,8 +27,9 @@ class Timeline(Iterable[Event]):
     A timeline is created by the local sync API and not instantiated directly.
     """
 
-    def __init__(self, iterable: Iterable[Event]) -> None:
+    def __init__(self, iterable: Iterable[Event], tzinfo: datetime.tzinfo) -> None:
         self._iterable = iterable
+        self._tzinfo = tzinfo
 
     def __iter__(self) -> Iterator[Event]:
         """Return an iterator as a traversal over events in chronological order."""
@@ -41,17 +43,20 @@ class Timeline(Iterable[Event]):
         """Return an iterator containing events active during the timespan.
         The end date is exclusive.
         """
-        timespan = Event(summary="", start=start, end=end)
+        timespan = Timespan.of(start.normalize(), end.normalize())
         for event in self:
-            if event.intersects(timespan):
+            timesp = event.timespan_of(timespan.tzinfo)
+            if timesp.intersects(timespan):
                 yield event
-            elif event > timespan:
+            elif timesp > timespan:
                 break
 
     def start_after(self, instant: DateOrDatetime) -> Iterator[Event]:
         """Return an iterator containing events starting after the specified time."""
+        value = instant.normalize(self._tzinfo)
         for event in self:
-            if event.start > instant:
+            timesp = event.timespan_of(value.tzinfo)
+            if timesp.start > value:
                 yield event
 
     def active_after(
@@ -59,8 +64,10 @@ class Timeline(Iterable[Event]):
         instant: DateOrDatetime,
     ) -> Iterator[Event]:
         """Return an iterator containing events active after the specified time."""
+        value = instant.normalize(self._tzinfo)
         for event in self:
-            if event.start > instant or event.end > instant:
+            timesp = event.timespan_of(value.tzinfo)
+            if timesp.start > value or timesp.end > value:
                 yield event
 
     def at_instant(
@@ -68,15 +75,13 @@ class Timeline(Iterable[Event]):
         instant: datetime.date | datetime.datetime,
     ) -> Iterator[Event]:  # pylint: disable
         """Return an iterator containing events starting after the specified time."""
-        timespan = Event(
-            summary="",
-            start=DateOrDatetime.parse(instant),
-            end=DateOrDatetime.parse(instant),
-        )
+        value = DateOrDatetime.parse(instant).normalize(self._tzinfo)
+        timespan = Timespan.of(value, value)
         for event in self:
-            if event.includes(timespan):
+            timesp = event.timespan_of(timespan.tzinfo)
+            if timesp.includes(timespan):
                 yield event
-            elif event > timespan:
+            elif timesp > timespan:
                 break
 
     def on_date(self, day: datetime.date) -> Iterator[Event]:  # pylint: disable
@@ -101,9 +106,10 @@ class EventIterable(Iterable[Event]):
     This iterable will ignore recurring events entirely.
     """
 
-    def __init__(self, iterable: Iterable[Event]) -> None:
+    def __init__(self, iterable: Iterable[Event], tzinfo: datetime.tzinfo) -> None:
         """Initialize timeline."""
         self._iterable = iterable
+        self._tzinfo = tzinfo
 
     def __iter__(self) -> Iterator[Event]:
         """Return an iterator as a traversal over events in chronological order."""
@@ -114,7 +120,7 @@ class EventIterable(Iterable[Event]):
         for event in iter(self._iterable):
             if event.recurrence:
                 continue
-            heapq.heappush(heap, (event.start.normalize, event))
+            heapq.heappush(heap, (event.start.normalize(self._tzinfo), event))
         while heap:
             (_, event) = heapq.heappop(heap)
             yield event
@@ -151,11 +157,13 @@ class RecurAdapter:
         )
 
 
-def calendar_timeline(events: list[Event]) -> Timeline:
+def calendar_timeline(
+    events: list[Event], tzinfo: datetime.tzinfo = datetime.timezone.utc
+) -> Timeline:
     """Create a timeline for events on a calendar, including recurrence."""
-    iters: list[Iterable[Event]] = [EventIterable(events)]
+    iters: list[Iterable[Event]] = [EventIterable(events, tzinfo)]
     for event in events:
         if not event.recurrence:
             continue
         iters.append(RecurIterable(RecurAdapter(event).get, event.rrule))
-    return Timeline(MergedIterable(iters))
+    return Timeline(MergedIterable(iters), tzinfo)

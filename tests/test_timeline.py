@@ -11,7 +11,6 @@ from freezegun import freeze_time
 
 from gcal_sync.model import DateOrDatetime, Event
 from gcal_sync.timeline import Timeline, calendar_timeline
-from gcal_sync.util import use_local_timezone
 
 
 @pytest.fixture(name="timeline")
@@ -391,6 +390,7 @@ def test_all_day_with_local_timezone(
     tzname: str, dt_before: datetime.datetime, dt_after: datetime.datetime
 ) -> None:
     """Test iteration of all day events using local timezone override."""
+    local_tz = zoneinfo.ZoneInfo(tzname)
     timeline = calendar_timeline(
         [
             Event(
@@ -398,7 +398,8 @@ def test_all_day_with_local_timezone(
                 start=DateOrDatetime(date=datetime.date(2000, 2, 1)),
                 end=DateOrDatetime(date=datetime.date(2000, 2, 2)),
             ),
-        ]
+        ],
+        tzinfo=local_tz,
     )
 
     def start_after(dtstart: datetime.datetime) -> list[str]:
@@ -407,9 +408,11 @@ def test_all_day_with_local_timezone(
             e.summary for e in timeline.start_after(DateOrDatetime(date_time=dtstart))
         ]
 
-    with use_local_timezone(zoneinfo.ZoneInfo(tzname)):
-        assert start_after(dt_before) == ["event"]
-        assert not start_after(dt_after)
+    local_before = dt_before.astimezone(local_tz)
+    assert start_after(local_before) == ["event"]
+
+    local_after = dt_after.astimezone(local_tz)
+    assert not start_after(local_after)
 
 
 def test_invalid_rrule_until_datetime() -> None:
@@ -480,3 +483,54 @@ def test_invalid_rrule_until_local_datetime() -> None:
             datetime.datetime(2012, 12, 11, 19, 0),
         ),
     ]
+
+
+@pytest.mark.parametrize(
+    "time_zone,event_order",
+    [
+        ("America/Los_Angeles", ["One", "Two", "All Day Event"]),
+        ("America/Regina", ["One", "Two", "All Day Event"]),
+        ("UTC", ["One", "All Day Event", "Two"]),
+        ("Asia/Tokyo", ["All Day Event", "One", "Two"]),
+    ],
+)
+async def test_all_day_iter_order(
+    time_zone: str,
+    event_order: list[str],
+) -> None:
+    """Test the sort order of an all day events depending on the time zone."""
+    timeline = calendar_timeline(
+        [
+            Event.parse_obj(
+                {
+                    "summary": "All Day Event",
+                    "start": {"date": "2022-10-08"},
+                    "end": {"date": "2022-10-09"},
+                }
+            ),
+            Event.parse_obj(
+                {
+                    "summary": "One",
+                    "start": {"date_time": "2022-10-07T23:00:00+00:00"},
+                    "end": {"date_time": "2022-10-07T23:30:00+00:00"},
+                }
+            ),
+            Event.parse_obj(
+                {
+                    "summary": "Two",
+                    "start": {"date_time": "2022-10-08T01:00:00+00:00"},
+                    "end": {"date_time": "2022-10-08T02:00:00+00:00"},
+                }
+            ),
+        ],
+        zoneinfo.ZoneInfo(time_zone),
+    )
+    events = timeline.overlapping(
+        DateOrDatetime.parse(
+            datetime.datetime(2022, 10, 6, 0, 0, 0, tzinfo=datetime.timezone.utc)
+        ),
+        DateOrDatetime.parse(
+            datetime.datetime(2022, 10, 9, 0, 0, 0, tzinfo=datetime.timezone.utc)
+        ),
+    )
+    assert [event.summary for event in events] == event_order
