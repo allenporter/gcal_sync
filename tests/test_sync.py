@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import zoneinfo
 from collections.abc import Awaitable, Callable
 from unittest.mock import patch
 
@@ -678,10 +679,10 @@ async def test_canceled_events(
                     "summary": "Event 3",
                     "description": "Event description 3",
                     "start": {
-                        "date": "2022-04-15",
+                        "date": "2022-04-21",
                     },
                     "end": {
-                        "date": "2022-04-20",
+                        "date": "2022-04-22",
                     },
                 },
             ],
@@ -706,10 +707,34 @@ async def test_canceled_events(
             id="some-event-id-3",
             summary="Event 3",
             description="Event description 3",
-            start=DateOrDatetime(date=datetime.date(2022, 4, 15)),
-            end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
+            start=DateOrDatetime(date=datetime.date(2022, 4, 21)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 22)),
         ),
     ]
+
+    # Exercise the timeline and dependencies on the timezone
+    timeline = await sync.store_service.async_get_timeline(
+        zoneinfo.ZoneInfo("America/Regina")
+    )
+    assert [event.summary for event in timeline] == ["Event 2", "Event 3"]
+
+    event_iter = timeline.start_after(
+        DateOrDatetime.parse(
+            datetime.datetime(
+                2022, 4, 20, 23, 0, 0, tzinfo=zoneinfo.ZoneInfo("America/Regina")
+            )
+        )
+    )
+    assert [event.summary for event in event_iter] == ["Event 3"]
+
+    event_iter = timeline.start_after(
+        DateOrDatetime.parse(
+            datetime.datetime(
+                2022, 4, 21, 1, 0, 0, tzinfo=zoneinfo.ZoneInfo("America/Regina")
+            )
+        )
+    )
+    assert [event.summary for event in event_iter] == []
 
 
 async def test_event_sync_recover_failure(

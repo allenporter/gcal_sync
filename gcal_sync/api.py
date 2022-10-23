@@ -460,7 +460,9 @@ class CalendarEventStoreService:
             )
         )
 
-    async def async_get_timeline(self) -> Timeline:
+    async def async_get_timeline(
+        self, tzinfo: datetime.tzinfo | None = None
+    ) -> Timeline:
         """Get the timeline of events."""
         store_data = await self._store.async_load() or {}
         store_data.setdefault(ITEMS, {})
@@ -474,4 +476,4 @@ class CalendarEventStoreService:
                 continue
             events.append(event)
 
-        return calendar_timeline(events)
+        return calendar_timeline(events, tzinfo if tzinfo else datetime.timezone.utc)
