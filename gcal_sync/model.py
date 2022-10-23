@@ -1,4 +1,9 @@
-"Library for data model for local calendar objects." ""
+"""Library for data model for local calendar objects.
+
+This librayr contains [pydantic](https://pydantic-docs.helpmanual.io/) models
+for the Google Calendar API data model. These objects support all methods for
+parsing and serialization supported by pydnatic.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +17,17 @@ from dateutil import rrule
 from pydantic import BaseModel, Field, root_validator
 
 from .timespan import Timespan
+
+__all__ = [
+    "Calendar",
+    "Event",
+    "DateOrDatetime",
+    "EventStatusEnum",
+    "EventTypeEnum",
+    "VisibilityEnum",
+    "ResponseStatus",
+    "Attendee",
+]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,19 +43,33 @@ class Calendar(BaseModel):
     """Metadata associated with a calendar."""
 
     id: str
+    """Identifier of the calendar."""
+
     summary: str = ""
+    """Title of the calendar."""
+
     description: Optional[str]
+    """Description of the calendar."""
+
     location: Optional[str]
+    """Geographic location of the calendar as free-form text."""
+
     timezone: Optional[str] = Field(alias="timeZone", default=None)
+    """The time zone of the calendar."""
 
 
 class DateOrDatetime(BaseModel):
     """A date or datetime."""
 
     date: Optional[datetime.date] = Field(default=None)
+    """The date, in the format "yyyy-mm-dd", if this is an all-day event."""
+
     date_time: Optional[datetime.datetime] = Field(alias="dateTime", default=None)
+    """The time, as a combined date-time value."""
+
     # Note: timezone is only used for creating new events
     timezone: Optional[str] = Field(alias="timeZone", default=None)
+    """The time zone in which the time is specified."""
 
     @classmethod
     def parse(cls, value: datetime.date | datetime.datetime) -> DateOrDatetime:
@@ -69,7 +99,7 @@ class DateOrDatetime(BaseModel):
         return value
 
     @root_validator
-    def check_date_or_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
+    def _check_date_or_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Validate the date or datetime fields are set properly."""
         if not values.get("date") and not values.get("date_time"):
             raise ValueError("Unexpected missing date or dateTime value")
@@ -92,72 +122,142 @@ class EventStatusEnum(str, Enum):
     "Status of the event."
 
     CONFIRMED = "confirmed"
+    """The event is confirmed."""
+
     TENTATIVE = "tentative"
+    """The event is tentatively confirmed."""
+
     CANCELLED = "cancelled"
+    """The event is cancelled (deleted)."""
 
 
 class EventTypeEnum(str, Enum):
     """Type of the event."""
 
     DEFAULT = "default"
+    """A regular event or not further specified."""
+
     OUT_OF_OFFICE = "outOfOffice"
+    """An out-of-office event."""
+
     FOCUS_TIME = "focusTime"
+    """A focus-time event."""
 
 
 class VisibilityEnum(str, Enum):
     """Visibility of the event."""
 
     DEFAULT = "default"
+    """Uses the default visibility for events on the calendar."""
+
     PUBLIC = "public"
+    """The event is public and event details are visible to all readers of the calendar."""
+
     PRIVATE = "private"  # Same as confidential
+    """The event is private and only event attendees may view event details."""
 
 
 class ResponseStatus(str, Enum):
     """The attendee's response status."""
 
     NEEDS_ACTION = "needsAction"
+    """The attendee has not responded to the invitation (recommended for new events)."""
+
     DECLINED = "declined"
+    """The attendee has declined the invitation."""
+
     TENTATIVE = "tentative"
+    """The attendee has tentatively accepted the invitation."""
+
     ACCEPTED = "accepted"
+    """The attendee has accepted the invitation."""
 
 
 class Attendee(BaseModel):
     """An attendee of an event."""
 
     id: Optional[str] = None
+    """The attendee's Profile ID, if available."""
+
     email: str = ""
+    """The attendee's email address, if available."""
+
     display_name: Optional[str] = Field(alias="displayName", default=None)
+    """The attendee's name, if available."""
+
     optional: bool = False
+    """Whether this is an optional attendee."""
+
     comment: Optional[str] = None
+    """The attendee's response comment."""
+
     response_status: ResponseStatus = Field(
         alias="responseStatus", default=ResponseStatus.NEEDS_ACTION
     )
+    """The attendee's response status."""
 
 
 class Event(BaseModel):
     """A single event on a calendar."""
 
     id: Optional[str] = None
+    """Opaque identifier of the event."""
+
     ical_uuid: Optional[str] = Field(alias="iCalUID", default=None)
+    """Event unique identifier as defined in RFC5545."""
+
     summary: str = ""
+    """Title of the event."""
+
     start: DateOrDatetime
+    """The (inclusive) start time of the event."""
+
     end: DateOrDatetime
+    """The (exclusive) end time of the event."""
+
     description: Optional[str]
+    """Description of the event, which can contain HTML."""
+
     location: Optional[str]
+    """Geographic location of the event as free-form text."""
+
     transparency: str = Field(default="opaque")
+    """Whether the event blocks time on the calendar.
+
+    Will either be `opaque` which means the calendar does block time on the
+    calendar or `transparent` which means it does not block time on the calendar.
+    """
+
     # Note deleted events are only returned in some scenarios based on request options
     # such as enabling incremental sync or explicitly asking for deleted items. That is,
     # most users should not need to check the status.
     status: EventStatusEnum = EventStatusEnum.CONFIRMED
+    """Status of the event."""
+
     event_type: EventTypeEnum = Field(alias="eventType", default=EventTypeEnum.DEFAULT)
+    """Specific type of the event."""
+
     visibility: VisibilityEnum = VisibilityEnum.DEFAULT
+    """Visibility of the event."""
+
     attendees: list[Attendee] = []
+    """The attendees of the event."""
+
     attendees_omitted: bool = Field(alias="attendeesOmitted", default=False)
+    """Whether attendees may have been omitted from the event's representation."""
+
     recurrence: list[str] = []
+    """List of RRULE, EXRULE, RDATE and EXDATE lines for a recurring event.
+
+    See RFC5545 for more details."""
+
     recurring_event_id: Optional[str] = Field(alias="recurringEventId", default=None)
+    """The id of the primary even to which this recurring event belongs."""
+
     original_start_time: Optional[DateOrDatetime] = Field(
         alias="originalStartTime", default=None
     )
+    """A unique identifier for when this event would start in the original recurring event."""
 
     @property
     def computed_duration(self) -> datetime.timedelta:
@@ -175,7 +275,7 @@ class Event(BaseModel):
             ) from err
 
     @root_validator(pre=True)
-    def allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
+    def _allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Special case for canceled event tombstones that are missing required fields."""
         if status := values.get("status"):
             if status == EventStatusEnum.CANCELLED:
@@ -186,7 +286,7 @@ class Event(BaseModel):
         return values
 
     @root_validator(pre=True)
-    def adjust_visibility(cls, values: dict[str, Any]) -> dict[str, Any]:
+    def _adjust_visibility(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Convert legacy visibility types to new types."""
         if visibility := values.get("visibility"):
             if visibility == "confidential":
@@ -194,7 +294,7 @@ class Event(BaseModel):
         return values
 
     @root_validator
-    def validate_rrule(cls, values: dict[str, Any]) -> dict[str, Any]:
+    def _validate_rrule(cls, values: dict[str, Any]) -> dict[str, Any]:
         """The API returns invalid RRULEs that need to be coerced to valid."""
         # Rules may need updating of start time has a timezone
         if not (recurrence := values.get("recurrence")) or not (

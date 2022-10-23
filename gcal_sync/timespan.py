@@ -5,7 +5,7 @@ there are corner cases such as an all day event which does not specify a
 specific time, but instead needs to be interpreted in the timezone of the
 attendee. A timespan is unambiguous in that it is created with that timezone.
 A `Timespan` is not instantiated directly, but created by a calendar component
-such as an `Event`.
+such as an `gcal_sync.model.Event`.
 """
 
 from __future__ import annotations

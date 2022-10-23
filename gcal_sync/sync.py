@@ -1,4 +1,13 @@
-"""Library for handling local even sync."""
+"""Library for handling local event sync.
+
+This library implements the best practices for how to
+[Synchronize resources](https://developers.google.com/calendar/api/guides/sync)
+for a Google Calendar.
+
+To use this library, you create an instance of a sync manager then run the
+`run` method on a regular basis to pull down the latest information from the server. You
+may then query the latest information from the local store service.
+"""
 # pylint: disable=duplicate-code
 from __future__ import annotations
 

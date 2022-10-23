@@ -1,4 +1,19 @@
-"""Client library for talking to Google APIs."""
+"""Client library for talking to Google APIs.
+
+This is the primary class to use when talking to Google. This library defines
+the API service `GoogleCalendarService` as well as the request and response messages
+for things like listing the available calendars, or events on a calendar.
+
+This library also contains apis for local storage of calendars an events in
+`CalendarListStoreService` and `CalendarEventStoreService`.  See the `sync`
+library for more details on how to
+async down calendars and events to local storage.
+
+All of the request and response messages here use [pydantic](https://pydantic-docs.helpmanual.io/)
+for parsing and valdation of the constraints of the API. The API fields in the request and
+response methods are mirroring the Google Calendar API methods, so see the
+[reference](https://developers.google.com/calendar/api/v3/reference) for details.
+"""
 
 from __future__ import annotations
 
@@ -19,6 +34,22 @@ from .model import EVENT_FIELDS, Calendar, DateOrDatetime, Event, EventStatusEnu
 from .store import CalendarStore
 from .timeline import Timeline, calendar_timeline
 
+__all__ = [
+    "GoogleCalendarService",
+    "CalendarListStoreService",
+    "CalendarEventStoreService",
+    "CalendarListRequest",
+    "CalendarListResponse",
+    "ListEventsRequest",
+    "SyncEventsRequest",
+    "ListEventsResponse",
+    "LocalCalendarListResponse",
+    "LocalListEventsRequest",
+    "LocalListEventsResponse",
+    "Boolean",
+]
+
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -36,14 +67,20 @@ class SyncableRequest(BaseModel):
     """Base class for a request that supports sync."""
 
     page_token: Optional[str] = Field(default=None, alias="pageToken")
+    """Token specifying which result page to return."""
+
     sync_token: Optional[str] = Field(default=None, alias="syncToken")
+    """Token obtained from the last page of results of a previous request."""
 
 
 class SyncableResponse(BaseModel):
     """Base class for an API response that supports sync."""
 
     page_token: Optional[str] = Field(default=None, alias="nextPageToken")
+    """Token used to access the next page of this results."""
+
     sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
+    """Token used at a later point in time to retrieve entries changed."""
 
 
 class CalendarListRequest(SyncableRequest):
@@ -54,8 +91,7 @@ class CalendarListResponse(SyncableResponse):
     """Api response containing a list of calendars."""
 
     items: List[Calendar] = []
-    page_token: Optional[str] = Field(default=None, alias="nextPageToken")
-    sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
+    """The calendars on the user's calendar list."""
 
 
 def now() -> datetime.datetime:
@@ -81,9 +117,20 @@ class ListEventsRequest(SyncableRequest):
     """Api request to list events."""
 
     calendar_id: str = Field(alias="calendarId")
+    """Calendar identifier."""
+
     start_time: Optional[datetime.datetime] = Field(default=None, alias="timeMin")
+    """Lower bound (exclusive) for an event's end time to filter by."""
+
     end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
+    """Upper bound (exclusive) for an event's start time to filter by."""
+
     search: Optional[str] = Field(default=None, alias="q")
+    """Free text search terms to find events that match these terms
+
+    This matches the summary, description, location, attendee's displayName,
+    attendee's email.
+    """
 
     def to_request(self) -> _RawListEventsRequest:
         """Convert to the raw API request for sending to the API."""
@@ -94,19 +141,19 @@ class ListEventsRequest(SyncableRequest):
         )
 
     @validator("start_time", always=True)
-    def default_start_time(cls, value: datetime.datetime | None) -> datetime.datetime:
+    def _default_start_time(cls, value: datetime.datetime | None) -> datetime.datetime:
         """Select a default start time value of not specified."""
         if value is None:
             return now()
         return value
 
     @root_validator
-    def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
+    def _check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Validate the date or datetime fields are set properly."""
         return _validate_datetimes(values)
 
     class Config:
-        """Model configuration."""
+        """Pydantic model configuration."""
 
         allow_population_by_field_name = True
 
@@ -127,7 +174,7 @@ class SyncEventsRequest(ListEventsRequest):
         )
 
     @validator("start_time", always=True)
-    def default_start_time(cls, value: datetime.datetime) -> datetime.datetime:
+    def _default_start_time(cls, value: datetime.datetime) -> datetime.datetime:
         """Disables default value behavior."""
         return value
 
@@ -136,7 +183,10 @@ class OrderBy(str, enum.Enum):
     """Represents the order of events returned."""
 
     START_TIME = "startTime"
+    """Order events by start time."""
+
     UPDATED = "updated"
+    """Order by event update time."""
 
 
 class Boolean(str, enum.Enum):
@@ -147,7 +197,11 @@ class Boolean(str, enum.Enum):
 
 
 class _RawListEventsRequest(BaseModel):
-    """Api request to list events."""
+    """Api request to list events.
+
+    This is used internally to have separate validation between list event requests
+    and sync requests.
+    """
 
     calendar_id: str = Field(alias="calendarId")
     max_results: int = Field(default=EVENT_PAGE_SIZE, alias="maxResults")
@@ -242,7 +296,11 @@ class ListEventsResponse:
 
 
 class GoogleCalendarService:
-    """Calendar service interface to Google."""
+    """Calendar service interface to Google.
+
+    The `GoogleCalendarService` is the primary API service for this library. It supports
+    operations like listing calendars, or events.
+    """
 
     def __init__(
         self,
@@ -300,7 +358,11 @@ class GoogleCalendarService:
         self,
         request: ListEventsRequest,
     ) -> _ListEventsResponseModel:
-        """Return the list of events."""
+        """Return the list of events.
+
+        This is primarily intended to be an internal method used to page through
+        events using the async generator provided by `async_list_events`.
+        """
         params = request.to_request().as_dict()
         result = await self._auth.get_json(
             CALENDAR_EVENTS_URL.format(calendar_id=pathname2url(request.calendar_id)),
@@ -318,13 +380,17 @@ class LocalCalendarListResponse(BaseModel):
     """Api response containing a list of calendars."""
 
     calendars: List[Calendar] = []
+    """The list of calendars."""
 
 
 class LocalListEventsRequest(BaseModel):
-    """Api request to list events."""
+    """Api request to list events from the local event store."""
 
     start_time: datetime.datetime = Field(default_factory=now)
+    """Lower bound (exclusive) for an event's end time to filter by."""
+
     end_time: Optional[datetime.datetime] = Field(default=None)
+    """Upper bound (exclusive) for an event's start time to filter by."""
 
     @root_validator
     def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
@@ -341,6 +407,7 @@ class LocalListEventsResponse(BaseModel):
     """Api response containing a list of events."""
 
     events: List[Event] = Field(default=[])
+    """Events returned from the local store."""
 
 
 class CalendarListStoreService:

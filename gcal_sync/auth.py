@@ -1,4 +1,30 @@
-"""Authentication library, implemented by users of the library."""
+"""Authentication library, providing base classes for users of the library.
+
+In order to use `gcal_sync.api`, you need to implement `gcal_sync.AbstractAuth`
+which provides an OAuth access token. See Google's
+[Authentication and authorization overview][1] for general details on how to
+use OAuth, which involves things like redirecting a user to a web flow, and
+redirecting back with an access token.
+
+An example implementation of `gcal_sync.AbstractAuth` would need to handle things like
+passin in the access token and any other necessary OAuth token refreshes when the
+access token has expired.
+
+```
+from gcal_sync.auth import AbstractAuth
+
+class MyAuthImpl(gcal_sync.AbstractAuth):
+
+    def __init__(self, websession: aiohttp.ClientSession) -> None:
+        super().__init__(websession)
+
+    async def async_get_access_token(self) -> str:
+        return ...
+```
+
+[1]: https://developers.google.com/workspace/guides/auth-overview
+
+"""
 
 from __future__ import annotations
 
@@ -24,7 +50,12 @@ API_BASE_URL = "https://www.googleapis.com/calendar/v3"
 
 
 class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
-    """Library for providing authentication credentials."""
+    """Library for providing authentication credentials.
+
+    You are expected to implement a subclass and implement the abstract
+    methods when using the `gcal_sync.api` classes. The api library will
+    invoke this class and ask for the access token on outgoing requests.
+    """
 
     def __init__(self, websession: aiohttp.ClientSession, host: str | None = None):
         """Initialize the auth."""
