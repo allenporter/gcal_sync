@@ -1,5 +1,3 @@
-# gcal-sync
-
 An asyncio python library for the (Google Calendar API](https://developers.google.com/calendar/api). This library provides a simplified
 Google Calendar API that is lighter weight and more streamlined compared to using
 aiogoogle, and increased reliability by supporting efficient sync and reading
