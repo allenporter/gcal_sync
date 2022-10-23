@@ -62,8 +62,30 @@ async for result_page in result:
 ```
 
 Using the async generator avoids the need to manually handle paging and page tokens,
-but that is also available if needed.
+but that is also available if needed. Recurring events are expanded on the server by
+default, so you don't have to worry about handling them yourself.
 
+# Synchronization
+
+If you require a high read rate to the events, then it may be more efficient to
+first sync down the calendar then query local events. Any recurring events are
+expanded at query time by the local library by interpreting the recurrence rules
+on the synced event.
+
+```
+from gcal_sync.sync import CalendarListSyncManager
+
+sync = CalendarEventSyncManager(service)
+# Run when you want to sync down the latest set of events
+await sync.run()
+
+# Iterate over events in the local store
+timeline = await sync.store_service.async_get_timeline()
+for event in timeline:
+    print(event.summary)
+```
+
+See `gcal_sync.sync` for more details.
 
 ## Development Environment
 

@@ -5,9 +5,17 @@ from __future__ import annotations
 from abc import ABC
 from typing import Any
 
+__all__ = [
+    "CalendarStore",
+]
+
 
 class CalendarStore(ABC):
-    """Interface for external calendar storage."""
+    """Interface for external calendar storage.
+
+    This is an abstract class that may be implemented by callers to provide a
+    custom implementation for storing the calendar database.
+    """
 
     async def async_load(self) -> dict[str, Any] | None:
         """Load data."""
