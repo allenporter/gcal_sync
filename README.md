@@ -7,7 +7,7 @@ The focus of this API is on making it simple to access the most relevant parts o
 Calendar, for doing useful things. It may not support everything in the API however it
 should be easy to extend to do more as needed.
 
-## Quickstart
+# Quickstart
 
 In order to use the library, you'll need to do some work yourself to get authentication
 credentails. This depends a lot on the context (e.g. redirecting to use OAuth via web)
@@ -85,7 +85,7 @@ for event in timeline:
 
 See `gcal_sync.sync` for more details.
 
-## Development Environment
+# Development Environment
 
 ```bash
 $ python3 -m venv venv
