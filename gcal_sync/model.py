@@ -11,7 +11,7 @@ from typing import Any, Optional, Union
 from dateutil import rrule
 from pydantic import BaseModel, Field, root_validator
 
-from .util import MIDNIGHT, local_timezone
+from .timespan import Timespan
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ EVENT_FIELDS = (
     "id,summary,description,location,start,end,transparency,status,eventType,"
     "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime"
 )
+MIDNIGHT = datetime.time()
 
 
 class Calendar(BaseModel):
@@ -58,35 +59,34 @@ class DateOrDatetime(BaseModel):
             return self.date_time
         raise ValueError("Datetime has invalid state with no date or date_time")
 
-    @property
-    def normalize(self) -> datetime.datetime:
+    def normalize(self, tzinfo: datetime.tzinfo | None = None) -> datetime.datetime:
         """Convert date or datetime to a value that can be used for comparison."""
         value = self.value
         if not isinstance(value, datetime.datetime):
             value = datetime.datetime.combine(value, MIDNIGHT)
         if value.tzinfo is None:
-            value = value.replace(tzinfo=local_timezone())
+            value = value.replace(tzinfo=(tzinfo if tzinfo else datetime.timezone.utc))
         return value
 
     def __lt__(self, other: Any) -> bool:
         if not isinstance(other, DateOrDatetime):
             return NotImplemented
-        return self.normalize < other.normalize
+        return self.normalize() < other.normalize()
 
     def __gt__(self, other: Any) -> bool:
         if not isinstance(other, DateOrDatetime):
             return NotImplemented
-        return self.normalize > other.normalize
+        return self.normalize() > other.normalize()
 
     def __le__(self, other: Any) -> bool:
         if not isinstance(other, DateOrDatetime):
             return NotImplemented
-        return self.normalize <= other.normalize
+        return self.normalize() <= other.normalize()
 
     def __ge__(self, other: Any) -> bool:
         if not isinstance(other, DateOrDatetime):
             return NotImplemented
-        return self.normalize >= other.normalize
+        return self.normalize() >= other.normalize()
 
     @root_validator
     def check_date_or_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
@@ -221,9 +221,7 @@ class Event(BaseModel):
             dtstart := values.get("start")
         ):
             return values
-        _LOGGER.info("old=%s", values["recurrence"])
         values["recurrence"] = [cls._adjust_rrule(rule, dtstart) for rule in recurrence]
-        _LOGGER.info("new=%s", values["recurrence"])
         return values
 
     @classmethod
@@ -270,6 +268,20 @@ class Event(BaseModel):
             ) from err
         return rule
 
+    @property
+    def timespan(self) -> Timespan:
+        """Return a timespan representing the event start and end."""
+        return self.timespan_of(datetime.timezone.utc)
+
+    def timespan_of(self, tzinfo: datetime.tzinfo | None = None) -> Timespan:
+        """Return a timespan representing the event start and end."""
+        if tzinfo is None:
+            tzinfo = datetime.timezone.utc
+        return Timespan.of(
+            self.start.normalize(tzinfo),
+            self.end.normalize(tzinfo),
+        )
+
     def intersects(self, other: "Event") -> bool:
         """Return True if this event overlaps with the other event."""
         return (
@@ -286,7 +298,7 @@ class Event(BaseModel):
         )
 
     def _tuple(self) -> tuple[datetime.datetime, datetime.datetime]:
-        return (self.start.normalize, self.end.normalize)
+        return (self.start.normalize(), self.end.normalize())
 
     def __lt__(self, other: Any) -> bool:
         if not isinstance(other, Event):
