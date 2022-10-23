@@ -98,6 +98,7 @@ def test_event_with_date() -> None:
     assert event.end.date_time is None
     assert event.end.timezone is None
     assert event.end.value == datetime.date(2022, 4, 13)
+    assert event.timespan.duration == datetime.timedelta(days=1)
 
 
 def test_event_datetime() -> None:
@@ -308,6 +309,9 @@ def test_event_timezone_comparison() -> None:
     assert dt1.astimezone(datetime.timezone.utc) == dt2.astimezone(
         datetime.timezone.utc
     )
+
+    assert event1.intersects(event2)
+    assert not event1.includes(event2)
 
 
 def test_event_timezone_comparison_zimetone_not_used() -> None:

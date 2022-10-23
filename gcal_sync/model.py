@@ -68,26 +68,6 @@ class DateOrDatetime(BaseModel):
             value = value.replace(tzinfo=(tzinfo if tzinfo else datetime.timezone.utc))
         return value
 
-    def __lt__(self, other: Any) -> bool:
-        if not isinstance(other, DateOrDatetime):
-            return NotImplemented
-        return self.normalize() < other.normalize()
-
-    def __gt__(self, other: Any) -> bool:
-        if not isinstance(other, DateOrDatetime):
-            return NotImplemented
-        return self.normalize() > other.normalize()
-
-    def __le__(self, other: Any) -> bool:
-        if not isinstance(other, DateOrDatetime):
-            return NotImplemented
-        return self.normalize() <= other.normalize()
-
-    def __ge__(self, other: Any) -> bool:
-        if not isinstance(other, DateOrDatetime):
-            return NotImplemented
-        return self.normalize() >= other.normalize()
-
     @root_validator
     def check_date_or_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Validate the date or datetime fields are set properly."""
@@ -284,41 +264,31 @@ class Event(BaseModel):
 
     def intersects(self, other: "Event") -> bool:
         """Return True if this event overlaps with the other event."""
-        return (
-            other.start <= self.start < other.end
-            or other.start < self.end <= other.end
-            or self.start <= other.start < self.end
-            or self.start < other.end <= self.end
-        )
+        return self.timespan.intersects(other.timespan)
 
     def includes(self, other: "Event") -> bool:
         """Return True if the other event starts and ends within this event."""
-        return (
-            self.start <= other.start < self.end and self.start <= other.end < self.end
-        )
-
-    def _tuple(self) -> tuple[datetime.datetime, datetime.datetime]:
-        return (self.start.normalize(), self.end.normalize())
+        return self.timespan.includes(other.timespan)
 
     def __lt__(self, other: Any) -> bool:
         if not isinstance(other, Event):
             return NotImplemented
-        return self._tuple() < other._tuple()
+        return self.timespan < other.timespan
 
     def __gt__(self, other: Any) -> bool:
         if not isinstance(other, Event):
             return NotImplemented
-        return self._tuple() > other._tuple()
+        return self.timespan > other.timespan
 
     def __le__(self, other: Any) -> bool:
         if not isinstance(other, Event):
             return NotImplemented
-        return self._tuple() <= other._tuple()
+        return self.timespan <= other.timespan
 
     def __ge__(self, other: Any) -> bool:
         if not isinstance(other, Event):
             return NotImplemented
-        return self._tuple() >= other._tuple()
+        return self.timespan >= other.timespan
 
     class Config:
         """Model configuration."""
