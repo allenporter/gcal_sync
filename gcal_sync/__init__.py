@@ -10,5 +10,4 @@ __all__ = [
     "store",
     "sync",
     "timeline",
-    "timespan",
 ]
