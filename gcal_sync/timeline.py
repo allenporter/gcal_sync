@@ -11,9 +11,10 @@ import datetime
 import heapq
 from collections.abc import Iterable, Iterator
 
-from .iter import MergedIterable, RecurIterable
+from ical.iter import MergedIterable, RecurIterable
+from ical.timespan import Timespan
+
 from .model import DateOrDatetime, Event
-from .timespan import Timespan
 
 __all__ = ["Timeline"]
 
