@@ -25,10 +25,10 @@ from .conftest import CALENDAR_ID, ApiResult, ResponseResult
 
 SYNC_TIME = "2006-01-01T00:00:00%2B00:00"
 EVENT_LIST_PARAMS = (
-    f"maxResults=100&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+    f"maxResults=1000&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 )
 EVENT_PAGE_PARAMS = (
-    f"maxResults=100&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+    f"maxResults=1000&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 )
 
 
@@ -890,3 +890,59 @@ async def test_sync_required_fields(
     service = await calendar_service_cb()
     with pytest.raises(ValueError):
         CalendarEventSyncManager(service, store=store)
+
+
+async def test_event_sync_min_time(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    store: CalendarStore,
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+    request_reset: Callable[[], str],
+) -> None:
+    """Test syncing events with a minimum time of events to return."""
+    service = await calendar_service_cb()
+    sync = CalendarEventSyncManager(
+        service,
+        store=store,
+        request_template=SyncEventsRequest(
+            calendar_id=CALENDAR_ID, start_time=datetime.datetime(2022, 1, 1, 0, 0, 0)
+        ),
+    )
+
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "summary": "Event 1",
+                    "description": "Event description 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                    "transparency": "transparent",
+                },
+            ],
+            "nextSyncToken": "sync-token-1",
+        },
+    )
+    await sync.run()
+    assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}&timeMin=2022-01-01T00:00:00"
+    ]
+    request_reset()
+
+    json_response(
+        {
+            "items": [],
+            "nextSyncToken": "sync-token-2",
+        },
+    )
+    await sync.run()
+    assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}"
+        "&syncToken=sync-token-1"
+    ]

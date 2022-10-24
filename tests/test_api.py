@@ -11,7 +11,7 @@ from gcal_sync.model import EVENT_FIELDS, Calendar, DateOrDatetime, Event
 from .conftest import ApiRequest, ApiResult
 
 EVENT_LIST_PARAMS = (
-    "maxResults=100&singleEvents=true&orderBy=startTime"
+    "maxResults=1000&singleEvents=true&orderBy=startTime"
     f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 )
 

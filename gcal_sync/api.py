@@ -53,7 +53,7 @@ __all__ = [
 _LOGGER = logging.getLogger(__name__)
 
 
-EVENT_PAGE_SIZE = 100
+EVENT_PAGE_SIZE = 1000
 # pylint: disable=line-too-long
 EVENT_API_FIELDS = f"kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 
