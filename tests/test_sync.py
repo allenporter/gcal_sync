@@ -835,7 +835,7 @@ async def test_event_sync_with_search(
     url_request: Callable[[], str],
     request_reset: Callable[[], str],
 ) -> None:
-    """Test syncing events with a search string."""
+    """Test syncing events with a minimum time of events to return."""
     service = await calendar_service_cb()
     sync = CalendarEventSyncManager(
         service,
