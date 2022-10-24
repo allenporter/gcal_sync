@@ -14,9 +14,8 @@ from enum import Enum
 from typing import Any, Optional, Union
 
 from dateutil import rrule
+from ical.timespan import Timespan
 from pydantic import BaseModel, Field, root_validator
-
-from .timespan import Timespan
 
 __all__ = [
     "Calendar",
