@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field, ValidationError, root_validator, validato
 from .auth import AbstractAuth
 from .const import ITEMS
 from .exceptions import ApiException
-from .model import EVENT_FIELDS, Calendar, DateOrDatetime, Event, EventStatusEnum
+from .model import EVENT_FIELDS, Calendar, Event, EventStatusEnum
 from .store import CalendarStore
 from .timeline import Timeline, calendar_timeline
 
@@ -449,15 +449,13 @@ class CalendarEventStoreService:
             return LocalListEventsResponse(
                 events=list(
                     timeline.overlapping(
-                        DateOrDatetime(date_time=request.start_time),
-                        DateOrDatetime(date_time=request.end_time),
+                        request.start_time,
+                        request.end_time,
                     )
                 )
             )
         return LocalListEventsResponse(
-            events=list(
-                timeline.active_after(DateOrDatetime(date_time=request.start_time))
-            )
+            events=list(timeline.active_after(request.start_time))
         )
 
     async def async_get_timeline(

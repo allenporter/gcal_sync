@@ -214,32 +214,36 @@ def test_overlap(
     expected_events: list[str],
 ) -> None:
     """Test returning events on a particular day."""
-    assert [
-        e.summary
-        for e in timeline.overlapping(
-            DateOrDatetime.parse(start), DateOrDatetime.parse(end)
-        )
-    ] == expected_events
+    assert [e.summary for e in timeline.overlapping(start, end)] == expected_events
 
 
 def test_active_after(timeline: Timeline) -> None:
     """Test returning events on a particular day."""
-    events = [
-        e.summary
-        for e in timeline.active_after(DateOrDatetime.parse(datetime.date(2000, 2, 15)))
-    ]
+    events = [e.summary for e in timeline.active_after(datetime.date(2000, 2, 15))]
     assert events == ["third", "fourth"]
 
 
 @pytest.mark.parametrize(
     "at_datetime,expected_events",
     [
-        (datetime.datetime(2000, 1, 1, 11, 15), ["first"]),
-        (datetime.datetime(2000, 1, 1, 11, 59), []),
-        (datetime.datetime(2000, 1, 1, 12, 0), ["second"]),
-        (datetime.datetime(2000, 1, 1, 12, 30), ["second"]),
-        (datetime.datetime(2000, 1, 1, 12, 59), ["second"]),
-        (datetime.datetime(2000, 1, 1, 13, 0), []),
+        (
+            datetime.datetime(2000, 1, 1, 11, 15, tzinfo=datetime.timezone.utc),
+            ["first"],
+        ),
+        (datetime.datetime(2000, 1, 1, 11, 59, tzinfo=datetime.timezone.utc), []),
+        (
+            datetime.datetime(2000, 1, 1, 12, 0, tzinfo=datetime.timezone.utc),
+            ["second"],
+        ),
+        (
+            datetime.datetime(2000, 1, 1, 12, 30, tzinfo=datetime.timezone.utc),
+            ["second"],
+        ),
+        (
+            datetime.datetime(2000, 1, 1, 12, 59, tzinfo=datetime.timezone.utc),
+            ["second"],
+        ),
+        (datetime.datetime(2000, 1, 1, 13, 0, tzinfo=datetime.timezone.utc), []),
     ],
 )
 def test_at_instant(
@@ -249,18 +253,6 @@ def test_at_instant(
     assert [
         e.summary for e in calendar_times.at_instant(at_datetime)
     ] == expected_events
-
-
-@freeze_time("2000-01-01 12:30:00")
-def test_now(calendar_times: Timeline) -> None:
-    """Test events happening at the current time."""
-    assert [e.summary for e in calendar_times.now()] == ["second"]
-
-
-@freeze_time("2000-01-01 13:00:00")
-def test_now_no_match(calendar_times: Timeline) -> None:
-    """Test no events happening at the current time."""
-    assert [e.summary for e in calendar_times.now()] == []
 
 
 @freeze_time("2000-01-01 12:30:00")
@@ -404,9 +396,7 @@ def test_all_day_with_local_timezone(
 
     def start_after(dtstart: datetime.datetime) -> list[str]:
         nonlocal timeline
-        return [
-            e.summary for e in timeline.start_after(DateOrDatetime(date_time=dtstart))
-        ]
+        return [e.summary for e in timeline.start_after(dtstart)]
 
     local_before = dt_before.astimezone(local_tz)
     assert start_after(local_before) == ["event"]
@@ -526,11 +516,7 @@ async def test_all_day_iter_order(
         zoneinfo.ZoneInfo(time_zone),
     )
     events = timeline.overlapping(
-        DateOrDatetime.parse(
-            datetime.datetime(2022, 10, 6, 0, 0, 0, tzinfo=datetime.timezone.utc)
-        ),
-        DateOrDatetime.parse(
-            datetime.datetime(2022, 10, 9, 0, 0, 0, tzinfo=datetime.timezone.utc)
-        ),
+        datetime.datetime(2022, 10, 6, 0, 0, 0, tzinfo=datetime.timezone.utc),
+        datetime.datetime(2022, 10, 9, 0, 0, 0, tzinfo=datetime.timezone.utc),
     )
     assert [event.summary for event in events] == event_order

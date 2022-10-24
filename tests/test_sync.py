@@ -719,19 +719,15 @@ async def test_canceled_events(
     assert [event.summary for event in timeline] == ["Event 2", "Event 3"]
 
     event_iter = timeline.start_after(
-        DateOrDatetime.parse(
-            datetime.datetime(
-                2022, 4, 20, 23, 0, 0, tzinfo=zoneinfo.ZoneInfo("America/Regina")
-            )
+        datetime.datetime(
+            2022, 4, 20, 23, 0, 0, tzinfo=zoneinfo.ZoneInfo("America/Regina")
         )
     )
     assert [event.summary for event in event_iter] == ["Event 3"]
 
     event_iter = timeline.start_after(
-        DateOrDatetime.parse(
-            datetime.datetime(
-                2022, 4, 21, 1, 0, 0, tzinfo=zoneinfo.ZoneInfo("America/Regina")
-            )
+        datetime.datetime(
+            2022, 4, 21, 1, 0, 0, tzinfo=zoneinfo.ZoneInfo("America/Regina")
         )
     )
     assert [event.summary for event in event_iter] == []
