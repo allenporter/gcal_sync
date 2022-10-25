@@ -67,7 +67,7 @@ async def _run_sync(
     sync_token_version = store_data.get(SYNC_TOKEN_VERSION)
     if sync_token_version and sync_token_version < VERSION:
         _LOGGER.debug(
-            "Invaliding token with version {sync_token_version}, {TOKEN_VERSION}"
+            "Invaliding token with version %s, %s", sync_token_version, VERSION
         )
         store_data[SYNC_TOKEN] = None
         store_data[ITEMS] = {}
