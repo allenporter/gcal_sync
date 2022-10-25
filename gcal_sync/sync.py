@@ -37,7 +37,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # Can be incremented to blow away existing store
-VERSION = 1
+VERSION = 2
 MIN_SYNC_DATETIME = datetime.datetime(2006, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
 
 T = TypeVar("T", bound=SyncableRequest)
