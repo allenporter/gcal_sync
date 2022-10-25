@@ -32,7 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 
 DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
-    "id,summary,description,location,start,end,transparency,status,eventType,"
+    "id,iCalUID,summary,start,end,description,location,transparency,status,eventType,"
     "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime"
 )
 MIDNIGHT = datetime.time()

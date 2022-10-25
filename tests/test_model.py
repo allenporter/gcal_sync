@@ -10,6 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from gcal_sync.model import (
+    EVENT_FIELDS,
     Attendee,
     Calendar,
     DateOrDatetime,
@@ -626,3 +627,11 @@ def test_invalid_rrule_until_time() -> None:
                 "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20220202T1234T;BYDAY=TU"],
             }
         )
+
+
+def test_event_fields_mask() -> None:
+    """Test that all fields in the pydantic model are specified in the field mask."""
+
+    assert EVENT_FIELDS == ",".join(
+        [field.alias for field in Event.__fields__.values()]
+    )
