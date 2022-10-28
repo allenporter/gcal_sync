@@ -15,6 +15,7 @@ from gcal_sync.model import (
     Calendar,
     DateOrDatetime,
     Event,
+    EventId,
     EventStatusEnum,
     EventTypeEnum,
     ResponseStatus,
@@ -635,3 +636,78 @@ def test_event_fields_mask() -> None:
     assert EVENT_FIELDS == ",".join(
         [field.alias for field in Event.__fields__.values()]
     )
+
+
+def test_event_recurrence_id_all_day() -> None:
+    """Test creating a recurrence id for an all day event."""
+    assert (
+        EventId("event-id", datetime.date(2022, 10, 2)).event_id == "event-id_20221002"
+    )
+
+
+def test_event_recurrence_id_utc() -> None:
+    """Test creating a recurrence id for an event in UTC."""
+    assert (
+        EventId(
+            "event-id",
+            datetime.datetime(2022, 10, 2, 5, 32, 00, tzinfo=datetime.timezone.utc),
+        ).event_id
+        == "event-id_20221002T053200Z"
+    )
+
+
+def test_event_recurrence_id_tzinfo() -> None:
+    """Test creating a recurrence id for an event with a specific timezone"""
+    assert (
+        EventId(
+            "event-id",
+            datetime.datetime(
+                2022, 10, 2, 5, 32, 00, tzinfo=zoneinfo.ZoneInfo("America/Regina")
+            ),
+        ).event_id
+        == "event-id_20221002T113200Z"
+    )
+
+
+def test_parse_event_id_not_recurring() -> None:
+    """Validate an event id that is not recurring."""
+    event_id = EventId.parse("event-id")
+    assert event_id.event_id == "event-id"
+    assert event_id.original_event_id == "event-id"
+    assert not event_id.dtstart
+
+
+def test_parse_event_recurrence_id_all_day() -> None:
+    """Test parsing recurrence ids for an all day event."""
+    rid = EventId.parse("event-id_20221002")
+    assert rid.event_id == "event-id_20221002"
+    assert rid.original_event_id == "event-id"
+    assert rid.dtstart == datetime.date(2022, 10, 2)
+
+
+def test_parse_event_recurrence_id() -> None:
+    """Test parsing recurrence ids."""
+    rid = EventId.parse("event-id_20221002T053200Z")
+    assert rid.event_id == "event-id_20221002T053200Z"
+    assert rid.original_event_id == "event-id"
+    assert rid.dtstart == datetime.datetime(
+        2022, 10, 2, 5, 32, 00, tzinfo=datetime.timezone.utc
+    )
+
+
+@pytest.mark.parametrize(
+    "event_id",
+    [
+        "event_id_",
+        "event-id_2022100",
+        "event_id_20221002T053200",
+        "event-id_20221002T053200Y",
+        "event_id_20221002053200",
+        "event_id_202q1002",
+        "event-id_20221002T05q200Z",
+    ],
+)
+def test_invalid_event_id(event_id: str) -> None:
+    """Test invalid event id values."""
+    with pytest.raises(ValueError):
+        EventId.parse(event_id)

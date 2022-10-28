@@ -7,12 +7,16 @@ from freezegun import freeze_time
 
 from gcal_sync.api import GoogleCalendarService, ListEventsRequest
 from gcal_sync.model import EVENT_FIELDS, Calendar, DateOrDatetime, Event
+from gcal_sync.sync import CalendarEventSyncManager
 
 from .conftest import ApiRequest, ApiResult
 
 EVENT_LIST_PARAMS = (
     "maxResults=1000&singleEvents=true&orderBy=startTime"
     f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+)
+EVENT_SYNC_PARAMS = (
+    f"maxResults=1000&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 )
 
 
@@ -460,3 +464,51 @@ async def test_list_event_url_encoding(
         f"/calendars/en.usa#holiday@group.v.calendar.google.com/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-04-30T01:31:02%2B00:00"
     ]
+
+
+async def test_delete_event(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+    post_body: Callable[[], str],
+) -> None:
+    """Test lookup events API."""
+    json_response(
+        {
+            "id": "some-event-id-1",
+            "iCalUID": "some-event-id-1@google.com",
+            "summary": "Event 1",
+            "description": "Event description 1",
+            "start": {
+                "date": "2022-04-13",
+            },
+            "end": {
+                "date": "2022-04-14",
+            },
+            "status": "confirmed",
+            "transparency": "transparent",
+            "recurrence": [
+                "FREQ=WEEKLY;COUNT=5",
+            ],
+        },
+    )
+    json_response({})
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "status": "cancelled",
+                },
+            ],
+            "nextSyncToken": "example-token-2",
+        }
+    )
+    sync = await event_sync_manager_cb()
+    await sync.store_service.async_delete_event("some-event-id-1")
+    assert url_request() == [
+        "/calendars/some-calendar-id/events/some-event-id-1",
+        "/calendars/some-calendar-id/events/some-event-id-1",
+        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
+    ]
+    assert post_body() == [{}]

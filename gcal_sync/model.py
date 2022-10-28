@@ -15,6 +15,7 @@ from typing import Any, Optional, Union
 
 from dateutil import rrule
 from ical.timespan import Timespan
+from ical.types.recur import Recur
 from pydantic import BaseModel, Field, root_validator
 
 __all__ = [
@@ -196,6 +197,88 @@ class Attendee(BaseModel):
     """The attendee's response status."""
 
 
+class EventId:
+    """Used to generate a recurring event id from the original event id."""
+
+    def __init__(
+        self, event_id: str, dtstart: datetime.date | datetime.datetime | None
+    ) -> None:
+        self._event_id = event_id
+        self._dtstart = dtstart
+
+    @classmethod
+    def of(  # pylint: disable=invalid-name]
+        cls, event_id: str, dtstart: datetime.date | datetime.datetime | None
+    ) -> EventId:
+        """Create a EventId based on the optional recurring id instance."""
+        return EventId(event_id, dtstart)
+
+    @classmethod
+    def parse(cls, event_id: str) -> EventId:
+        """Parse a EventId from the event id string."""
+        parts = event_id.split("_")
+        if len(parts) == 1:
+            # Not a recurring event
+            return EventId(event_id, None)
+        if len(parts) != 2:
+            raise ValueError(f"EventId had invalid parts: {event_id}")
+        dtstart: datetime.date | datetime.datetime
+        if len(parts[1]) != 8:
+            if parts[1][-1] != "Z":
+                raise ValueError(f"EventId had invalid timezone: {event_id}")
+
+            dtstart = datetime.datetime.strptime(
+                parts[1][:-1], "%Y%m%dT%H%M%S"
+            ).replace(tzinfo=datetime.timezone.utc)
+        else:
+            dtstart = datetime.datetime.strptime(parts[1], "%Y%m%d").date()
+        return EventId(parts[0], dtstart)
+
+    @property
+    def event_id(self) -> str:
+        """Return the string value of the new event id."""
+        if self._dtstart is None:
+            return self._event_id
+        if isinstance(self._dtstart, datetime.datetime):
+            utc = self._dtstart.astimezone(datetime.timezone.utc)
+            return f"{self._event_id}_{utc.strftime('%Y%m%dT%H%M%SZ')}"
+        return f"{self._event_id}_{self._dtstart.strftime('%Y%m%d')}"
+
+    @property
+    def original_event_id(self) -> str:
+        """Return the underlying/original event id."""
+        return self._event_id
+
+    @property
+    def dtstart(self) -> datetime.date | datetime.datetime | None:
+        """Return the date value for the event id."""
+        return self._dtstart
+
+
+class EventUuid:
+    """Validate and parse a Google Calendar iCalUUID field."""
+
+    def __init__(self, event_id: str) -> None:
+        self._event_id = event_id
+
+    @classmethod
+    def of(cls, ical_uuid: str) -> EventUuid:  # pylint: disable=invalid-name]
+        """Parse the ical_uuid string to an object."""
+        if not ical_uuid.endswith("@google.com"):
+            raise ValueError(f"EventUuid had unexpected value: {ical_uuid}")
+        return EventUuid(ical_uuid[:-11])
+
+    @property
+    def event_uuid(self) -> str:
+        """Return the iCalUUID value."""
+        return "{self._event_id}@google.com"
+
+    @property
+    def event_id(self) -> str:
+        """Return the original event id."""
+        return self._event_id
+
+
 class Event(BaseModel):
     """A single event on a calendar."""
 
@@ -203,7 +286,12 @@ class Event(BaseModel):
     """Opaque identifier of the event."""
 
     ical_uuid: Optional[str] = Field(alias="iCalUID", default=None)
-    """Event unique identifier as defined in RFC5545."""
+    """Event unique identifier as defined in RFC5545.
+
+    Note that the iCalUID and the id are not identical. One difference in
+    their semantics is that in recurring events, all occurrences of one event
+    have different ids while they all share the same iCalUIDs.
+    """
 
     summary: str = ""
     """Title of the event."""
@@ -273,6 +361,13 @@ class Event(BaseModel):
                 f"Invalid recurrence rule: {self.json()}: {str(err)}"
             ) from err
 
+    @property
+    def recur(self) -> Recur:
+        """Build a recurrence rule for the event."""
+        if len(self.recurrence) != 1:
+            raise ValueError(f"Unexpected recurrence value: {self.recurrence}")
+        return Recur.from_rrule(self.recurrence[0])
+
     @root_validator(pre=True)
     def _allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Special case for canceled event tombstones that are missing required fields."""
@@ -301,6 +396,17 @@ class Event(BaseModel):
         ):
             return values
         values["recurrence"] = [cls._adjust_rrule(rule, dtstart) for rule in recurrence]
+        return values
+
+    @root_validator
+    def _validate_ids(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Validates that IDs return by the API are parseable."""
+        if event_id := values.get("id"):
+            EventId.parse(event_id)
+
+        if ical_uuid := values.get("ical_uuid"):
+            EventUuid.of(ical_uuid)
+
         return values
 
     @classmethod
