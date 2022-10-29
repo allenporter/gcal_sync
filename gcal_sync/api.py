@@ -629,10 +629,3 @@ class CalendarEventStoreService:
         store_data = await self._store.async_load() or {}
         store_data.setdefault(ITEMS, {})
         return store_data.get(ITEMS, {})
-
-    async def _lookup_event(self, uid: str) -> Event | None:
-        """Find the specified event by id."""
-        events_data = await self._lookup_events_data()
-        if data := events_data.get(uid):
-            return Event.parse_obj(data)
-        return None
