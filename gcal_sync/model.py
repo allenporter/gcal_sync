@@ -255,30 +255,6 @@ class EventId:
         return self._dtstart
 
 
-class EventUuid:
-    """Validate and parse a Google Calendar iCalUUID field."""
-
-    def __init__(self, event_id: str) -> None:
-        self._event_id = event_id
-
-    @classmethod
-    def of(cls, ical_uuid: str) -> EventUuid:  # pylint: disable=invalid-name]
-        """Parse the ical_uuid string to an object."""
-        if not ical_uuid.endswith("@google.com"):
-            raise ValueError(f"EventUuid had unexpected value: {ical_uuid}")
-        return EventUuid(ical_uuid[:-11])
-
-    @property
-    def event_uuid(self) -> str:
-        """Return the iCalUUID value."""
-        return "{self._event_id}@google.com"
-
-    @property
-    def event_id(self) -> str:
-        """Return the original event id."""
-        return self._event_id
-
-
 class Event(BaseModel):
     """A single event on a calendar."""
 
@@ -403,10 +379,8 @@ class Event(BaseModel):
         """Validates that IDs return by the API are parseable."""
         if event_id := values.get("id"):
             EventId.parse(event_id)
-
-        if ical_uuid := values.get("ical_uuid"):
-            EventUuid.of(ical_uuid)
-
+        if recurring_event_id := values.get("recurring_event_id"):
+            EventId.parse(recurring_event_id)
         return values
 
     @classmethod
