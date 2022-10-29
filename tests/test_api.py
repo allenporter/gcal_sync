@@ -668,3 +668,50 @@ async def test_invalid_event_id(
         await sync.store_service.async_delete_event(
             event_id="some-event-id-1_20220404",
         )
+
+
+async def test_store_create_event_with_date(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_request: Callable[[], str],
+    url_request: Callable[[], str],
+    json_response: ApiResult,
+) -> None:
+    """Test create event API."""
+
+    start_date = datetime.date(2022, 4, 15)
+    end_date = start_date + datetime.timedelta(days=2)
+
+    event = Event(
+        summary="Summary",
+        description="Description",
+        start=DateOrDatetime(date=start_date),
+        end=DateOrDatetime(date=end_date),
+    )
+
+    json_response({})
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "status": "cancelled",
+                },
+            ],
+            "nextSyncToken": "example-token-2",
+        }
+    )
+
+    sync = await event_sync_manager_cb()
+    await sync.store_service.async_add_event(event)
+    assert url_request() == [
+        "/calendars/some-calendar-id/events",
+        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
+    ]
+    assert json_request() == [
+        {
+            "summary": "Summary",
+            "description": "Description",
+            "start": {"date": "2022-04-15"},
+            "end": {"date": "2022-04-17"},
+        }
+    ]

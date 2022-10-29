@@ -539,11 +539,7 @@ class CalendarEventStoreService:
         return calendar_timeline(events, tzinfo if tzinfo else datetime.timezone.utc)
 
     async def async_add_event(self, event: Event) -> None:
-        """Add the specified event to the calendar.
-
-        This will handle assigning modification dates, sequence numbers, etc
-        if those fields are unset.
-        """
+        """Add the specified event to the calendar."""
         _LOGGER.debug("Adding event: %s", event)
         await self._api.async_create_event(self._calendar_id, event)
         await self._update_cb()
