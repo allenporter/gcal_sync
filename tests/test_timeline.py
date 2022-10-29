@@ -615,3 +615,17 @@ def test_all_day_recurrence_fields() -> None:
     assert event3.summary == "summary"
     assert event3.id == "event-id_20220806"
     assert event3.original_start_time == DateOrDatetime.parse(datetime.date(2022, 8, 4))
+
+
+def test_missing_event_id() -> None:
+    """Test an invalid event can't be used for recurring events."""
+    event = Event(
+        summary="summary",
+        start=DateOrDatetime.parse(datetime.date(2022, 8, 4)),
+        end=DateOrDatetime.parse(datetime.date(2022, 8, 5)),
+        recurrence=["RRULE:FREQ=DAILY;UNTIL=20220904"],
+    )
+    timeline_iter = iter(calendar_timeline([event]))
+
+    with pytest.raises(ValueError, match="Expected event to have event id"):
+        next(timeline_iter)
