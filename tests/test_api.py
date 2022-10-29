@@ -512,22 +512,10 @@ async def test_delete_event(
 ) -> None:
     """Test lookup events API."""
     json_response({})
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "some-event-id-1",
-                    "status": "cancelled",
-                },
-            ],
-            "nextSyncToken": "example-token-2",
-        }
-    )
     sync = await event_sync_manager_cb()
     await sync.store_service.async_delete_event("some-event-id-1")
     assert url_request() == [
         "/calendars/some-calendar-id/events/some-event-id-1",
-        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
     ]
     assert json_request() == []
 
@@ -559,17 +547,6 @@ async def test_delete_recurring_event_instance(
         },
     )
     json_response({})
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "some-event-id-1",
-                    "status": "cancelled",
-                },
-            ],
-            "nextSyncToken": "example-token-2",
-        }
-    )
     sync = await event_sync_manager_cb()
     await sync.store_service.async_delete_event(
         event_id="some-event-id-1",
@@ -579,7 +556,6 @@ async def test_delete_recurring_event_instance(
     assert url_request() == [
         "/calendars/some-calendar-id/events/some-event-id-1",
         "/calendars/some-calendar-id/events/some-event-id-1_20220420",
-        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
     ]
     assert json_request() == [
         {
@@ -616,17 +592,6 @@ async def test_delete_recurring_event_and_future(
         },
     )
     json_response({})
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "some-event-id-1",
-                    "status": "cancelled",
-                },
-            ],
-            "nextSyncToken": "example-token-2",
-        }
-    )
     sync = await event_sync_manager_cb()
     await sync.store_service.async_delete_event(
         event_id="some-event-id-1",
@@ -636,7 +601,6 @@ async def test_delete_recurring_event_and_future(
     assert url_request() == [
         "/calendars/some-calendar-id/events/some-event-id-1",
         "/calendars/some-calendar-id/events/some-event-id-1",
-        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
     ]
     assert json_request() == [
         {
@@ -689,23 +653,10 @@ async def test_store_create_event_with_date(
     )
 
     json_response({})
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "some-event-id-1",
-                    "status": "cancelled",
-                },
-            ],
-            "nextSyncToken": "example-token-2",
-        }
-    )
-
     sync = await event_sync_manager_cb()
     await sync.store_service.async_add_event(event)
     assert url_request() == [
         "/calendars/some-calendar-id/events",
-        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
     ]
     assert json_request() == [
         {

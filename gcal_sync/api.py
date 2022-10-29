@@ -493,13 +493,11 @@ class CalendarEventStoreService:
         store: CalendarStore,
         calendar_id: str,
         api: GoogleCalendarService,
-        update_cb: Callable[[], Awaitable[None]],
     ) -> None:
         """Initialize CalendarEventStoreService."""
         self._store = store
         self._calendar_id = calendar_id
         self._api = api
-        self._update_cb = update_cb
 
     async def async_list_events(
         self,
@@ -539,10 +537,12 @@ class CalendarEventStoreService:
         return calendar_timeline(events, tzinfo if tzinfo else datetime.timezone.utc)
 
     async def async_add_event(self, event: Event) -> None:
-        """Add the specified event to the calendar."""
+        """Add the specified event to the calendar.
+
+        You should sync the event store after adding an event.
+        """
         _LOGGER.debug("Adding event: %s", event)
         await self._api.async_create_event(self._calendar_id, event)
-        await self._update_cb()
 
     async def async_delete_event(
         self,
@@ -559,8 +559,16 @@ class CalendarEventStoreService:
         be specified. To delete an individual instances of the event the
         `recurrence_id` must be specified.
 
+        You will need to take care to handle recurring events specially. A
+        recurring event created by the timeline will have a unique `event_id`
+        which will actually by the `recurrence_id` for this API. The events
+        `recurring_event_id` will be the `event_id` as it refers to the
+        original event.
+
         When deleting individual instances, the range property may specify
         if deletion of just a specific instance, or a range of instances.
+
+        You should sync the event store after performing a delete operation.
         """
         # Deleting all instances in the series
         if not recurrence_id:
@@ -570,7 +578,6 @@ class CalendarEventStoreService:
                 )
 
             await self._api.async_delete_event(self._calendar_id, event_id)
-            await self._update_cb()
             return
 
         parsed_recurrence_id = EventId.parse(recurrence_id)
@@ -598,7 +605,6 @@ class CalendarEventStoreService:
             await self._api.async_patch_event(
                 self._calendar_id, parsed_recurrence_id.event_id, body
             )
-            await self._update_cb()
             return
 
         # Assumes any recurrence deletion is valid, and that overwriting
@@ -622,7 +628,6 @@ class CalendarEventStoreService:
         del body["start"]
         del body["end"]
         await self._api.async_patch_event(self._calendar_id, event_id, body)
-        await self._update_cb()
 
     async def _lookup_events_data(self) -> dict[str, Any]:
         """Find the specified event by id."""
