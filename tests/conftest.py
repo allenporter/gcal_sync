@@ -182,6 +182,7 @@ def mock_request_reset(app: aiohttp.web.Application) -> Callable[[], None]:
     def _reset() -> None:
         app["request"].clear()
         app["response"].clear()
+        app["request-json"].clear()
         app["request-post"].clear()
 
     return _reset

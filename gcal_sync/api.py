@@ -337,19 +337,6 @@ class GoogleCalendarService:
         )
         return Event.parse_obj(result)
 
-    async def async_create_event(
-        self,
-        calendar_id: str,
-        event: Event,
-    ) -> None:
-        """Create an event on the specified calendar."""
-        body = json.loads(
-            event.json(exclude_unset=True, by_alias=True, exclude={"calendar_id"})
-        )
-        await self._auth.post(
-            CALENDAR_EVENTS_URL.format(calendar_id=pathname2url(calendar_id)), json=body
-        )
-
     async def async_list_events(
         self,
         request: ListEventsRequest,
@@ -386,6 +373,32 @@ class GoogleCalendarService:
             _LOGGER.debug("Unable to parse result: %s", result)
             raise ApiException("Error parsing API response") from err
 
+    async def async_create_event(
+        self,
+        calendar_id: str,
+        event: Event,
+    ) -> None:
+        """Create an event on the specified calendar."""
+        body = json.loads(event.json(exclude_unset=True, by_alias=True))
+        await self._auth.post(
+            CALENDAR_EVENTS_URL.format(calendar_id=pathname2url(calendar_id)), json=body
+        )
+
+    async def async_patch_event(
+        self,
+        calendar_id: str,
+        event_id: str,
+        body: dict[str, Any],
+    ) -> None:
+        """Updates an event using patch semantics, with raw API data."""
+        await self._auth.request(
+            "put",
+            CALENDAR_EVENT_ID_URL.format(
+                calendar_id=pathname2url(calendar_id), event_id=pathname2url(event_id)
+            ),
+            json=body,
+        )
+
     async def async_delete_event(
         self,
         calendar_id: str,
@@ -397,25 +410,6 @@ class GoogleCalendarService:
             CALENDAR_EVENT_ID_URL.format(
                 calendar_id=pathname2url(calendar_id), event_id=pathname2url(event_id)
             ),
-        )
-
-    async def async_patch_event(
-        self,
-        calendar_id: str,
-        event: Event,
-    ) -> None:
-        """Delete an event on the specified calendar."""
-        if not event.id:
-            raise ValueError("Event did not have an id")
-        body = json.loads(
-            event.json(exclude_unset=True, by_alias=True, exclude={"calendar_id"})
-        )
-        await self._auth.request(
-            "patch",
-            CALENDAR_EVENT_ID_URL.format(
-                calendar_id=pathname2url(calendar_id), event_id=pathname2url(event.id)
-            ),
-            json=body,
         )
 
 
@@ -557,7 +551,7 @@ class CalendarEventStoreService:
     async def async_delete_event(
         self,
         event_id: str,
-        recurrence_id: EventId | None = None,
+        recurrence_id: str | None = None,
         recurrence_range: Range = Range.NONE,
     ) -> None:
         """Delete the event from the calendar.
@@ -572,31 +566,42 @@ class CalendarEventStoreService:
         When deleting individual instances, the range property may specify
         if deletion of just a specific instance, or a range of instances.
         """
-        event = await self._api.async_get_event(self._calendar_id, event_id)
-
         # Deleting all instances in the series
         if not recurrence_id:
+            if EventId.parse(event_id).dtstart:
+                raise ValueError(
+                    "Event id was recurring event instance not original instance"
+                )
+
             await self._api.async_delete_event(self._calendar_id, event_id)
             await self._update_cb()
             return
 
+        parsed_recurrence_id = EventId.parse(recurrence_id)
+        if not parsed_recurrence_id.dtstart:
+            raise ValueError("Invalid recurrence_id did not reference event")
+
         # Deleting one or more instances in the recurrence
+        event = await self._api.async_get_event(self._calendar_id, event_id)
         if not event.recurrence:
             raise ValueError("Specified recurrence_id but event is not recurring")
-
-        if not recurrence_id.dtstart:
-            raise ValueError("Invalid recurrence_id did not reference event")
 
         if recurrence_range == Range.NONE:
             # A single recurrence instance is removed, marked as cancelled
             cancelled_event = Event.parse_obj(
                 {
-                    "id": recurrence_id.event_id,
+                    "id": parsed_recurrence_id.event_id,
                     "status": EventStatusEnum.CANCELLED,
-                    # Need to add start/end fields
+                    "start": event.start,
+                    "end": event.end,
                 }
             )
-            await self._api.async_patch_event(self._calendar_id, cancelled_event)
+            body = json.loads(cancelled_event.json(exclude_unset=True, by_alias=True))
+            del body["start"]
+            del body["end"]
+            await self._api.async_patch_event(
+                self._calendar_id, parsed_recurrence_id.event_id, body
+            )
             await self._update_cb()
             return
 
@@ -608,9 +613,19 @@ class CalendarEventStoreService:
         # Stop recurring events before the specified date. This assumes that
         # setting the "util" field won't create more instances by changing count.
         rule.count = 0
-        rule.until = recurrence_id.dtstart - datetime.timedelta(seconds=1)
-        event.recurrence = [rule.as_rrule_str()]
-        await self._api.async_patch_event(self._calendar_id, event)
+        rule.until = parsed_recurrence_id.dtstart - datetime.timedelta(seconds=1)
+        updated_event = Event.parse_obj(
+            {
+                "id": event_id,
+                "recurrence": [rule.as_rrule_str()],
+                "start": event.start,
+                "end": event.end,
+            }
+        )
+        body = json.loads(updated_event.json(exclude_unset=True, by_alias=True))
+        del body["start"]
+        del body["end"]
+        await self._api.async_patch_event(self._calendar_id, event_id, body)
         await self._update_cb()
 
     async def _lookup_events_data(self) -> dict[str, Any]:
