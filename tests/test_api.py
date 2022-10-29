@@ -715,3 +715,35 @@ async def test_store_create_event_with_date(
             "end": {"date": "2022-04-17"},
         }
     ]
+
+
+async def test_delete_event_not_recurring(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+) -> None:
+    """Test lookup events API."""
+    json_response(
+        {
+            "id": "some-event-id-1",
+            "iCalUID": "some-event-id-1@google.com",
+            "summary": "Event 1",
+            "description": "Event description 1",
+            "start": {
+                "date": "2022-04-13",
+            },
+            "end": {
+                "date": "2022-04-14",
+            },
+            "status": "confirmed",
+            "transparency": "transparent",
+        },
+    )
+    sync = await event_sync_manager_cb()
+    with pytest.raises(
+        ValueError, match="Specified recurrence_id but event is not recurring"
+    ):
+        await sync.store_service.async_delete_event(
+            event_id="some-event-id-1",
+            recurrence_id="some-event-id-1_20220420",
+            recurrence_range=Range.NONE,
+        )
