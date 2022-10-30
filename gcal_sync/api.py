@@ -298,32 +298,6 @@ class ListEventsResponse:
             response = ListEventsResponse(page_result)
 
 
-class EventInstancesRequest(SyncableRequest):
-    """Api request to return instances of events of calendars."""
-
-    calendar_id: str = Field(alias="calendarId")
-    """Calendar identifier."""
-
-    event_id: str = Field(alias="eventId")
-    """Recurring event identifier."""
-
-    start_time: Optional[datetime.datetime] = Field(default=None, alias="timeMin")
-    """Lower bound (exclusive) for an event's end time to filter by."""
-
-    end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
-    """Upper bound (exclusive) for an event's start time to filter by."""
-
-    max_results: int = Field(default=EVENT_PAGE_SIZE, alias="maxResults")
-    time_zone: Optional[str] = Field(default=None, alias="timeZone")
-
-
-class EventInstancesResponse(SyncableResponse):
-    """Api response to return instances of events on calendars."""
-
-    items: List[Event] = []
-    """The calendars on the user's calendar list."""
-
-
 class GoogleCalendarService:
     """Calendar service interface to Google.
 
@@ -412,25 +386,6 @@ class GoogleCalendarService:
             json=body,
         )
 
-    async def async_update_event(
-        self,
-        calendar_id: str,
-        event: Event,
-    ) -> None:
-        """Updates an event."""
-        if not event.id:
-            raise ValueError("Event had no event id field")
-        body = json.loads(
-            event.json(exclude_unset=True, exclude_none=True, by_alias=True)
-        )
-        await self._auth.request(
-            "put",
-            CALENDAR_EVENT_ID_URL.format(
-                calendar_id=pathname2url(calendar_id), event_id=pathname2url(event.id)
-            ),
-            json=body,
-        )
-
     async def async_patch_event(
         self,
         calendar_id: str,
@@ -458,29 +413,6 @@ class GoogleCalendarService:
                 calendar_id=pathname2url(calendar_id), event_id=pathname2url(event_id)
             ),
         )
-
-    async def async_event_instances(
-        self,
-        request: EventInstancesRequest,
-    ) -> EventInstancesResponse:
-        """Return the instances of recurring events."""
-        params = {}
-        if request:
-            params = json.loads(
-                request.json(
-                    exclude_none=True,
-                    by_alias=True,
-                    exclude={"calendar_id", "event_id"},
-                )
-            )
-        result = await self._auth.get_json(
-            INSTANCES_URL.format(
-                calendar_id=pathname2url(request.calendar_id),
-                event_id=pathname2url(request.event_id),
-            ),
-            params=params,
-        )
-        return EventInstancesResponse.parse_obj(result)
 
 
 class LocalCalendarListResponse(BaseModel):

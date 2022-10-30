@@ -7,7 +7,6 @@ import pytest
 from freezegun import freeze_time
 
 from gcal_sync.api import (
-    EventInstancesRequest,
     GoogleCalendarService,
     ListEventsRequest,
     LocalListEventsRequest,
@@ -734,68 +733,3 @@ async def test_delete_event_not_recurring(
             recurring_event_id="some-event-id-1",
             recurrence_range=Range.NONE,
         )
-
-
-async def test_event_instances(
-    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
-    json_response: ApiResult,
-    url_request: Callable[[], str],
-) -> None:
-    """Test listing event instances in the API."""
-
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "some-event-id-1_20220413",
-                    "summary": "Event 1",
-                    "description": "Event description 1",
-                    "start": {
-                        "date": "2022-04-13",
-                    },
-                    "end": {
-                        "date": "2022-04-14",
-                    },
-                    "status": "confirmed",
-                    "recurring_event_id": "some-event-id-1",
-                },
-                {
-                    "id": "some-event-id-1_20220420",
-                    "summary": "Event 1",
-                    "description": "Event description 1",
-                    "start": {
-                        "date": "2022-04-20",
-                    },
-                    "end": {
-                        "date": "2022-04-21",
-                    },
-                    "recurring_event_id": "some-event-id-1",
-                },
-            ]
-        }
-    )
-    calendar_service = await calendar_service_cb()
-    result = await calendar_service.async_event_instances(
-        EventInstancesRequest(calendarId="some-calendar-id", eventId="some-event-id1")
-    )
-    assert url_request() == [
-        "/calendars/some-calendar-id/events/some-event-id1/instances?maxResults=1000"
-    ]
-    assert result.items == [
-        Event(
-            id="some-event-id-1_20220413",
-            summary="Event 1",
-            description="Event description 1",
-            start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
-            end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
-            recurring_event_id="some-event-id-1",
-        ),
-        Event(
-            id="some-event-id-1_20220420",
-            summary="Event 1",
-            description="Event description 1",
-            start=DateOrDatetime(date=datetime.date(2022, 4, 20)),
-            end=DateOrDatetime(date=datetime.date(2022, 4, 21)),
-            recurring_event_id="some-event-id-1",
-        ),
-    ]
