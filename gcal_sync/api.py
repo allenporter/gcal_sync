@@ -548,55 +548,50 @@ class CalendarEventStoreService:
 
     async def async_delete_event(
         self,
+        ical_uuid: str,
         event_id: str | None = None,
-        recurring_event_id: str | None = None,
         recurrence_range: Range = Range.NONE,
     ) -> None:
         """Delete the event from the calendar.
 
         This method is used to delete an existing event. For a recurring event
-        either the whole event or instances of an event may be deleted.
+        either the whole event or instances of an event may be deleted. As a result,
+        it operates in terms of iCalUUID which is fixed across instances of
+        recurring events.
 
-        To delete the complete range of a recurring event, the `recurring_event_id`
-        for the event must be specified and the `event_id` should not be specified.
+        To delete the complete range of a recurring event, the `ical_uuid` for the
+        event must be specified without a `recurrence_id`.
 
-        To delete individual instances or range of instances both the `recurring_event_id`
-        and `event_id` for the instances should be specified. The `recurrence_range`
+        To delete individual instances or a range of instances of a recurring event
+        both the `ical_uuid` and `event_id` can be specified. The `recurrence_range`
         determines if its just the individual event (`Range.NONE`) or also including
         events going forward (`Range.THIS_AND_FUTURE`)
 
-        You should sync the event store after performing a delete operation.
+        The local store may be used in some scenarios to deterine the appropriate
+        commands to send to the calendar API, so it may be operating on stale data.
+        You should sync the event store after performing a delete operation to
+        ensure the store reflects the latest information from the server
         """
-        if not recurring_event_id:
-            if not event_id:
-                raise ValueError(
-                    "At least one of event_id and recurring_event_id must be specified"
-                )
-            # Deleting a single event
-            await self._api.async_delete_event(self._calendar_id, event_id)
-            return
+        event = await self._lookup_ical_uuid(ical_uuid)
+        if not event or not event.id:
+            raise ValueError(f"Event does not exist: {ical_uuid} or malformed")
 
-        if not event_id:
-            # Deleting an entire series of a recurring event
-            await self._api.async_delete_event(self._calendar_id, recurring_event_id)
+        if not event_id or not event.recurrence:
+            # Deleting a single event or entire series of a recurring event
+            await self._api.async_delete_event(self._calendar_id, event.id)
             return
-
-        # Both an event_id and recurring_event_id are specified, so deleting one or
-        # more instances in the recurring event series
-        event = await self._lookup_event(recurring_event_id)
-        if not event:
-            raise ValueError(f"Event does not exist: {recurring_event_id}")
-        if not event.recurrence:
-            raise ValueError(
-                f"Specified recurrence_id but event is not recurring: {event_id}, {recurring_event_id}"
-            )
 
         synthetic_event_id = SyntheticEventId.parse(event_id)
+        if synthetic_event_id.original_event_id != event.id:
+            raise ValueError(
+                f"Mismatched ids ical_uuid={ical_uuid} and event_id={event_id}"
+            )
+
         if recurrence_range == Range.NONE:
             # A single recurrence instance is removed, marked as cancelled
             cancelled_event = Event.parse_obj(
                 {
-                    "id": event_id,
+                    "id": event_id,  # Event instance
                     "status": EventStatusEnum.CANCELLED,
                     "start": event.start,
                     "end": event.end,
@@ -619,7 +614,7 @@ class CalendarEventStoreService:
         rule.until = synthetic_event_id.dtstart - datetime.timedelta(seconds=1)
         updated_event = Event.parse_obj(
             {
-                "id": recurring_event_id,
+                "id": event.id,  # Primary event
                 "recurrence": [rule.as_rrule_str()],
                 "start": event.start,
                 "end": event.end,
@@ -628,7 +623,7 @@ class CalendarEventStoreService:
         body = json.loads(updated_event.json(exclude_unset=True, by_alias=True))
         del body["start"]
         del body["end"]
-        await self._api.async_patch_event(self._calendar_id, recurring_event_id, body)
+        await self._api.async_patch_event(self._calendar_id, event.id, body)
 
     async def _lookup_events_data(self) -> dict[str, Any]:
         """Loookup the raw events storage dictionary."""
@@ -636,10 +631,10 @@ class CalendarEventStoreService:
         store_data.setdefault(ITEMS, {})
         return store_data.get(ITEMS, {})
 
-    async def _lookup_event(self, event_id: str) -> Event | None:
+    async def _lookup_ical_uuid(self, ical_uuid: str) -> Event | None:
         """Find the specified event by id in the local store."""
-        event_store_data = await self._lookup_events_data()
-        _LOGGER.debug("store_data=%s", event_store_data)
-        if event_data := event_store_data.get(event_id):
-            return Event.parse_obj(event_data)
+        events_data = await self._lookup_events_data()
+        for data in events_data.values():
+            if (event_uuid := data.get("ical_uuid")) and event_uuid == ical_uuid:
+                return Event.parse_obj(data)
         return None

@@ -346,11 +346,13 @@ class Event(BaseModel):
     calendar or `transparent` which means it does not block time on the calendar.
     """
 
-    # Note deleted events are only returned in some scenarios based on request options
-    # such as enabling incremental sync or explicitly asking for deleted items. That is,
-    # most users should not need to check the status.
     status: EventStatusEnum = EventStatusEnum.CONFIRMED
-    """Status of the event."""
+    """Status of the event.
+
+    Note that deleted events are only returned in some scenarios based on request options
+    such as enabling incremental sync or explicitly asking for deleted items. That is,
+    most use cases should not need to involve checking the status.
+    """
 
     event_type: EventTypeEnum = Field(alias="eventType", default=EventTypeEnum.DEFAULT)
     """Specific type of the event."""
