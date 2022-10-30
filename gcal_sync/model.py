@@ -15,6 +15,7 @@ from typing import Any, Optional, Union
 
 from dateutil import rrule
 from ical.timespan import Timespan
+from ical.types.recur import Recur
 from pydantic import BaseModel, Field, root_validator
 
 __all__ = [
@@ -36,6 +37,7 @@ EVENT_FIELDS = (
     "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime"
 )
 MIDNIGHT = datetime.time()
+ID_DELIM = "_"
 
 
 class Calendar(BaseModel):
@@ -196,6 +198,82 @@ class Attendee(BaseModel):
     """The attendee's response status."""
 
 
+class SyntheticEventId:
+    """Used to generate a event ids for synthetic recurring events.
+
+    A `gcal_sync.timeline.Timeline` will create synthetic events for each instance
+    of a recurring event. The API returns the original event id of the underlying
+    event as `recurring_event_id`. This class is used to create the synthetic
+    unique `event_id` that includes the date or datetime value of the event instance.
+
+    This class does not generate values in the `recurring_event_id` field.
+    """
+
+    def __init__(
+        self, event_id: str, dtstart: datetime.date | datetime.datetime
+    ) -> None:
+        self._event_id = event_id
+        self._dtstart = dtstart
+
+    @classmethod
+    def of(  # pylint: disable=invalid-name]
+        cls,
+        event_id: str,
+        dtstart: datetime.date | datetime.datetime,
+    ) -> SyntheticEventId:
+        """Create a SyntheticEventId based on the event instance."""
+        return SyntheticEventId(event_id, dtstart)
+
+    @classmethod
+    def parse(cls, synthetic_event_id: str) -> SyntheticEventId:
+        """Parse a SyntheticEventId from the event id string."""
+        parts = synthetic_event_id.rsplit(ID_DELIM, maxsplit=1)
+        if len(parts) != 2:
+            raise ValueError(
+                f"id was not a valid synthetic_event_id: {synthetic_event_id}"
+            )
+        dtstart: datetime.date | datetime.datetime
+        if len(parts[1]) != 8:
+            if len(parts[1]) == 0 or parts[1][-1] != "Z":
+                raise ValueError(
+                    f"SyntheticEventId had invalid date/time or timezone: {synthetic_event_id}"
+                )
+
+            dtstart = datetime.datetime.strptime(
+                parts[1][:-1], "%Y%m%dT%H%M%S"
+            ).replace(tzinfo=datetime.timezone.utc)
+        else:
+            dtstart = datetime.datetime.strptime(parts[1], "%Y%m%d").date()
+        return SyntheticEventId(parts[0], dtstart)
+
+    @classmethod
+    def is_valid(cls, synthetic_event_id: str) -> bool:
+        """Return true if the value is a valid SyntheticEventId string."""
+        try:
+            cls.parse(synthetic_event_id)
+        except ValueError:
+            return False
+        return True
+
+    @property
+    def event_id(self) -> str:
+        """Return the string value of the new event id."""
+        if isinstance(self._dtstart, datetime.datetime):
+            utc = self._dtstart.astimezone(datetime.timezone.utc)
+            return f"{self._event_id}{ID_DELIM}{utc.strftime('%Y%m%dT%H%M%SZ')}"
+        return f"{self._event_id}{ID_DELIM}{self._dtstart.strftime('%Y%m%d')}"
+
+    @property
+    def original_event_id(self) -> str:
+        """Return the underlying/original event id."""
+        return self._event_id
+
+    @property
+    def dtstart(self) -> datetime.date | datetime.datetime:
+        """Return the date value for the event id."""
+        return self._dtstart
+
+
 class Event(BaseModel):
     """A single event on a calendar."""
 
@@ -203,7 +281,12 @@ class Event(BaseModel):
     """Opaque identifier of the event."""
 
     ical_uuid: Optional[str] = Field(alias="iCalUID", default=None)
-    """Event unique identifier as defined in RFC5545."""
+    """Event unique identifier as defined in RFC5545.
+
+    Note that the iCalUID and the id are not identical. One difference in
+    their semantics is that in recurring events, all occurrences of one event
+    have different ids while they all share the same iCalUIDs.
+    """
 
     summary: str = ""
     """Title of the event."""
@@ -272,6 +355,13 @@ class Event(BaseModel):
             raise ValueError(
                 f"Invalid recurrence rule: {self.json()}: {str(err)}"
             ) from err
+
+    @property
+    def recur(self) -> Recur:
+        """Build a recurrence rule for the event."""
+        if len(self.recurrence) != 1:
+            raise ValueError(f"Unexpected recurrence value: {self.recurrence}")
+        return Recur.from_rrule(self.recurrence[0])
 
     @root_validator(pre=True)
     def _allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:

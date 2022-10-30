@@ -9,7 +9,7 @@ from itertools import islice
 import pytest
 from freezegun import freeze_time
 
-from gcal_sync.model import DateOrDatetime, Event
+from gcal_sync.model import DateOrDatetime, Event, SyntheticEventId
 from gcal_sync.timeline import Timeline, calendar_timeline
 
 
@@ -349,6 +349,7 @@ def test_day_iteration(
 ) -> None:
     """Test recurrence rules for day frequency."""
     event = Event(
+        id="event-id",
         summary="summary",
         start=DateOrDatetime.parse(start),
         end=DateOrDatetime.parse(end),
@@ -409,6 +410,7 @@ def test_invalid_rrule_until_datetime() -> None:
     """Test recurrence rule with mismatched UNTIL value from google api."""
     event = Event.parse_obj(
         {
+            "id": "event-id",
             "summary": "Summary",
             "start": {"date": "2012-11-27"},
             "end": {"date": "2012-11-28"},
@@ -427,6 +429,7 @@ def test_invalid_rrule_until_date() -> None:
     """Test recurrence rule with mismatched UNTIL value from google api."""
     event = Event.parse_obj(
         {
+            "id": "event-id",
             "summary": "Summary",
             "start": {"date_time": "2020-07-06T18:00:00-07:00"},
             "end": {"date_time": "2020-07-06T22:00:00-07:00"},
@@ -455,6 +458,7 @@ def test_invalid_rrule_until_local_datetime() -> None:
     """Test recurrence rule with mismatched UNTIL value from google api."""
     event = Event.parse_obj(
         {
+            "id": "event-id",
             "summary": "Summary",
             "start": {"date_time": "2012-11-27T18:00:00"},
             "end": {"date_time": "2012-11-27T19:00:00"},
@@ -493,6 +497,7 @@ async def test_all_day_iter_order(
         [
             Event.parse_obj(
                 {
+                    "id": "event-id-all-day",
                     "summary": "All Day Event",
                     "start": {"date": "2022-10-08"},
                     "end": {"date": "2022-10-09"},
@@ -500,6 +505,7 @@ async def test_all_day_iter_order(
             ),
             Event.parse_obj(
                 {
+                    "id": "event-id-1",
                     "summary": "One",
                     "start": {"date_time": "2022-10-07T23:00:00+00:00"},
                     "end": {"date_time": "2022-10-07T23:30:00+00:00"},
@@ -507,6 +513,7 @@ async def test_all_day_iter_order(
             ),
             Event.parse_obj(
                 {
+                    "id": "event-id-2",
                     "summary": "Two",
                     "start": {"date_time": "2022-10-08T01:00:00+00:00"},
                     "end": {"date_time": "2022-10-08T02:00:00+00:00"},
@@ -520,3 +527,129 @@ async def test_all_day_iter_order(
         datetime.datetime(2022, 10, 9, 0, 0, 0, tzinfo=datetime.timezone.utc),
     )
     assert [event.summary for event in events] == event_order
+
+
+def test_recurrence_fields() -> None:
+    """Test recurrence rules for day frequency."""
+    event = Event(
+        id="event-id",
+        summary="summary",
+        start=DateOrDatetime.parse(
+            datetime.datetime(
+                2022, 8, 4, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
+            )
+        ),
+        end=DateOrDatetime.parse(
+            datetime.datetime(
+                2022, 8, 4, 10, 00, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
+            )
+        ),
+        recurrence=["RRULE:FREQ=DAILY;UNTIL=20220904"],
+    )
+    timeline_iter = iter(calendar_timeline([event]))
+    event1 = next(timeline_iter)
+    assert event1.id
+    assert event1.summary == "summary"
+    sid = SyntheticEventId.parse(event1.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.datetime(
+        2022, 8, 4, 16, 30, tzinfo=datetime.timezone.utc
+    )
+    assert event1.start == DateOrDatetime.parse(
+        datetime.datetime(
+            2022, 8, 4, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
+        )
+    )
+    assert event1.original_start_time == DateOrDatetime.parse(
+        datetime.datetime(
+            2022, 8, 4, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
+        )
+    )
+
+    event2 = next(timeline_iter)
+    assert event2.summary == "summary"
+    assert event2.id
+    sid = SyntheticEventId.parse(event2.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.datetime(
+        2022, 8, 5, 16, 30, tzinfo=datetime.timezone.utc
+    )
+    assert event2.start == DateOrDatetime.parse(
+        datetime.datetime(
+            2022, 8, 5, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
+        )
+    )
+    assert event2.original_start_time == DateOrDatetime.parse(
+        datetime.datetime(
+            2022, 8, 4, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
+        )
+    )
+
+    event3 = next(timeline_iter)
+    assert event3.summary == "summary"
+    assert event3.id
+    sid = SyntheticEventId.parse(event3.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.datetime(
+        2022, 8, 6, 16, 30, tzinfo=datetime.timezone.utc
+    )
+    assert event3.start == DateOrDatetime.parse(
+        datetime.datetime(
+            2022, 8, 6, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
+        )
+    )
+    assert event3.original_start_time == DateOrDatetime.parse(
+        datetime.datetime(
+            2022, 8, 4, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
+        )
+    )
+
+
+def test_all_day_recurrence_fields() -> None:
+    """Test recurrence rules for day frequency."""
+    event = Event(
+        id="event-id",
+        summary="summary",
+        start=DateOrDatetime.parse(datetime.date(2022, 8, 4)),
+        end=DateOrDatetime.parse(datetime.date(2022, 8, 5)),
+        recurrence=["RRULE:FREQ=DAILY;UNTIL=20220904"],
+    )
+
+    timeline_iter = iter(calendar_timeline([event]))
+    event1 = next(timeline_iter)
+    assert event1.summary == "summary"
+    assert event1.id
+    sid = SyntheticEventId.parse(event1.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.date(2022, 8, 4)
+    assert event1.original_start_time == DateOrDatetime.parse(datetime.date(2022, 8, 4))
+
+    event2 = next(timeline_iter)
+    assert event2.summary == "summary"
+    assert event2.id
+    sid = SyntheticEventId.parse(event2.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.date(2022, 8, 5)
+    assert event2.original_start_time == DateOrDatetime.parse(datetime.date(2022, 8, 4))
+
+    event3 = next(timeline_iter)
+    assert event3.summary == "summary"
+    assert event3.id
+    sid = SyntheticEventId.parse(event3.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.date(2022, 8, 6)
+    assert event3.original_start_time == DateOrDatetime.parse(datetime.date(2022, 8, 4))
+
+
+def test_missing_event_id() -> None:
+    """Test an invalid event can't be used for recurring events."""
+    event = Event(
+        summary="summary",
+        start=DateOrDatetime.parse(datetime.date(2022, 8, 4)),
+        end=DateOrDatetime.parse(datetime.date(2022, 8, 5)),
+        recurrence=["RRULE:FREQ=DAILY;UNTIL=20220904"],
+    )
+    timeline_iter = iter(calendar_timeline([event]))
+
+    with pytest.raises(ValueError, match="Expected event to have event id"):
+        next(timeline_iter)

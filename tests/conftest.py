@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 from collections.abc import Awaitable, Callable
 from json import JSONDecodeError
@@ -11,7 +12,7 @@ import aiohttp
 import pytest
 from aiohttp.test_utils import TestClient
 
-from gcal_sync.api import GoogleCalendarService
+from gcal_sync.api import GoogleCalendarService, LocalListEventsRequest
 from gcal_sync.auth import AbstractAuth
 from gcal_sync.store import CalendarStore, InMemoryCalendarStore
 from gcal_sync.sync import CalendarEventSyncManager, CalendarListSyncManager
@@ -56,12 +57,12 @@ def create_event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 
 async def handler(request: aiohttp.web.Request) -> aiohttp.web.Response:
     """Handles the request, inserting response prepared by tests."""
-    if request.method == "POST":
+    if request.method != "GET":
         try:
             request.app["request-json"].append(await request.json())
         except JSONDecodeError as err:
             print(err)
-        request.app["request-post"].append(await request.post())
+        request.app["request-post"].append(dict(await request.post()))
     response = aiohttp.web.json_response()
     if len(request.app["response"]) > 0:
         response = request.app["response"].pop(0)
@@ -88,10 +89,19 @@ def mock_app() -> aiohttp.web.Application:
     app["request"] = []
     app["request-json"] = []
     app["request-post"] = []
+
     app.router.add_get("/users/me/calendarList", handler)
     app.router.add_get("/calendars/{calendarId}", handler)
+
     app.router.add_get("/calendars/{calendarId}/events", handler)
     app.router.add_post("/calendars/{calendarId}/events", handler)
+
+    app.router.add_get("/calendars/{calendarId}/events/{eventId}", handler)
+    app.router.add_put("/calendars/{calendarId}/events/{eventId}", handler)
+    app.router.add_patch("/calendars/{calendarId}/events/{eventId}", handler)
+    app.router.add_delete("/calendars/{calendarId}/events/{eventId}", handler)
+
+    app.router.add_get("/calendars/{calendarId}/events/{eventId}/instances", handler)
     return app
 
 
@@ -174,6 +184,8 @@ def mock_request_reset(app: aiohttp.web.Application) -> Callable[[], None]:
     def _reset() -> None:
         app["request"].clear()
         app["response"].clear()
+        app["request-json"].clear()
+        app["request-post"].clear()
 
     return _reset
 
@@ -194,6 +206,16 @@ def mock_json_request(app: aiohttp.web.Application) -> ApiRequest:
 
     def _get_request() -> list[dict[str, Any]]:
         return cast(List[dict[str, Any]], app["request-json"])
+
+    return _get_request
+
+
+@pytest.fixture(name="post_body")
+def mock_post_body(app: aiohttp.web.Application) -> Callable[[], list[str]]:
+    """Fixture to return the recieved post body."""
+
+    def _get_request() -> list[str]:
+        return cast(List[str], app["request-post"])
 
     return _get_request
 
@@ -251,3 +273,29 @@ def fake_event_sync_manager(
         return CalendarEventSyncManager(service, CALENDAR_ID, store)
 
     return func
+
+
+@pytest.fixture(name="fetch_events")
+async def mock_fetch_events(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]]
+) -> Callable[..., Awaitable[list[dict[str, Any]]]]:
+    """Fixture to return events on the calendar."""
+    sync = await event_sync_manager_cb()
+
+    async def _func(keys: set[str] | None = None) -> list[dict[str, Any]]:
+        items = await sync.store_service.async_list_events(
+            LocalListEventsRequest(
+                start_time=datetime.datetime.fromisoformat("2000-01-01 00:00:00"),
+                end_time=datetime.datetime.fromisoformat("2025-12-31 00:00:00"),
+            )
+        )
+        result = []
+        for event in items.events:
+            data = event.dict()
+            for key, _ in list(event.dict().items()):
+                if keys and key not in keys:
+                    del data[key]
+            result.append(data)
+        return result
+
+    return _func

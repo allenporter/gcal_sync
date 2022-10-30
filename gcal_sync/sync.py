@@ -176,7 +176,7 @@ class CalendarEventSyncManager:
     @property
     def store_service(self) -> CalendarEventStoreService:
         """Return the local API for fetching events."""
-        return CalendarEventStoreService(self._store)
+        return CalendarEventStoreService(self._store, self._calendar_id, self._api)
 
     @property
     def api(self) -> GoogleCalendarService:

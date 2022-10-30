@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from gcal_sync.model import (
     EVENT_FIELDS,
+    ID_DELIM,
     Attendee,
     Calendar,
     DateOrDatetime,
@@ -18,6 +19,7 @@ from gcal_sync.model import (
     EventStatusEnum,
     EventTypeEnum,
     ResponseStatus,
+    SyntheticEventId,
     VisibilityEnum,
 )
 
@@ -635,3 +637,62 @@ def test_event_fields_mask() -> None:
     assert EVENT_FIELDS == ",".join(
         [field.alias for field in Event.__fields__.values()]
     )
+
+
+def test_event_recurrence_id_all_day() -> None:
+    """Test creating a recurrence id for an all day event."""
+    syn_id = SyntheticEventId("event-id", datetime.date(2022, 10, 2))
+    assert syn_id.original_event_id == "event-id"
+    assert syn_id.dtstart == datetime.date(2022, 10, 2)
+    assert syn_id.event_id == SyntheticEventId.parse(syn_id.event_id).event_id
+
+
+def test_event_recurrence_id_utc() -> None:
+    """Test creating a recurrence id for an event in UTC."""
+    syn_id = SyntheticEventId(
+        "event-id",
+        datetime.datetime(2022, 10, 2, 5, 32, 00, tzinfo=datetime.timezone.utc),
+    )
+    assert syn_id.original_event_id == "event-id"
+    assert syn_id.dtstart == datetime.datetime(
+        2022, 10, 2, 5, 32, 00, tzinfo=datetime.timezone.utc
+    )
+    assert syn_id.event_id == SyntheticEventId.parse(syn_id.event_id).event_id
+
+
+def test_event_recurrence_id_tzinfo() -> None:
+    """Test creating a recurrence id for an event with a specific timezone"""
+    syn_id = SyntheticEventId(
+        "event-id",
+        datetime.datetime(
+            2022, 10, 2, 5, 32, 00, tzinfo=zoneinfo.ZoneInfo("America/Regina")
+        ),
+    )
+    assert syn_id.original_event_id == "event-id"
+    assert syn_id.dtstart == datetime.datetime(
+        2022, 10, 2, 5, 32, 00, tzinfo=zoneinfo.ZoneInfo("America/Regina")
+    )
+    assert syn_id.event_id == SyntheticEventId.parse(syn_id.event_id).event_id
+
+
+def test_parse_event_missing_sentinal() -> None:
+    """Validate an event id that is not recurring."""
+    assert not SyntheticEventId.is_valid("event-id")
+
+
+@pytest.mark.parametrize(
+    "event_id",
+    [
+        f"event_id{ID_DELIM}",
+        f"event-id{ID_DELIM}2022100",
+        f"event_id{ID_DELIM}20221002T053200",
+        f"event-id{ID_DELIM}20221002T053200Y",
+        f"event_id{ID_DELIM}20221002053200",
+        f"event_id{ID_DELIM}202q1002",
+        f"event-id{ID_DELIM}20221002T05q200Z",
+    ],
+)
+def test_invalid_event_id(event_id: str) -> None:
+    """Test invalid event id values."""
+    with pytest.raises(ValueError):
+        SyntheticEventId.parse(event_id)

@@ -3,16 +3,26 @@
 import datetime
 from collections.abc import Awaitable, Callable
 
+import pytest
 from freezegun import freeze_time
 
-from gcal_sync.api import GoogleCalendarService, ListEventsRequest
+from gcal_sync.api import (
+    GoogleCalendarService,
+    ListEventsRequest,
+    LocalListEventsRequest,
+    Range,
+)
 from gcal_sync.model import EVENT_FIELDS, Calendar, DateOrDatetime, Event
+from gcal_sync.sync import CalendarEventSyncManager
 
 from .conftest import ApiRequest, ApiResult
 
 EVENT_LIST_PARAMS = (
     "maxResults=1000&singleEvents=true&orderBy=startTime"
     f"&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
+)
+EVENT_SYNC_PARAMS = (
+    f"maxResults=1000&fields=kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 )
 
 
@@ -75,6 +85,43 @@ async def test_list_calendars_empty_reply(
     calendar_service = await calendar_service_cb()
     result = await calendar_service.async_list_calendars()
     assert result.items == []
+
+
+async def test_get_event(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test getting a single calendar event."""
+
+    json_response(
+        {
+            "id": "some-event-id-1",
+            "summary": "Event 1",
+            "description": "Event description 1",
+            "start": {
+                "date": "2022-04-13",
+            },
+            "end": {
+                "date": "2022-04-14",
+            },
+            "status": "confirmed",
+            "transparency": "transparent",
+        }
+    )
+    calendar_service = await calendar_service_cb()
+    event = await calendar_service.async_get_event(
+        "some-calendar-id", "some-event-id-1"
+    )
+    assert url_request() == ["/calendars/some-calendar-id/events/some-event-id-1"]
+    assert event == Event(
+        id="some-event-id-1",
+        summary="Event 1",
+        description="Event description 1",
+        start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
+        end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
+        transparency="transparent",
+    )
 
 
 @freeze_time("2022-04-30 07:31:02", tz_offset=-6)
@@ -460,3 +507,306 @@ async def test_list_event_url_encoding(
         f"/calendars/en.usa#holiday@group.v.calendar.google.com/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-04-30T01:31:02%2B00:00"
     ]
+
+
+async def test_delete_event(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+    json_request: Callable[[], str],
+) -> None:
+    """Test deleting an event."""
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "iCalUID": "some-event-id-1@google.com",
+                    "summary": "Event 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                }
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+    json_response({})
+    sync = await event_sync_manager_cb()
+    await sync.run()
+    await sync.store_service.async_delete_event("some-event-id-1")
+    assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
+        "/calendars/some-calendar-id/events/some-event-id-1",
+    ]
+    assert json_request() == []
+
+
+async def test_delete_recurring_event_instance(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+    json_request: Callable[[], str],
+) -> None:
+    """Test deleting a single instance of a recurring event."""
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "iCalUID": "some-event-id-1@google.com",
+                    "summary": "Event 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                    "recurrence": [
+                        "FREQ=WEEKLY;COUNT=5",
+                    ],
+                }
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+    json_response({})
+    sync = await event_sync_manager_cb()
+    await sync.run()
+
+    result = await sync.store_service.async_list_events(
+        LocalListEventsRequest(
+            start_time=datetime.datetime.fromisoformat("2022-04-12 00:00:00"),
+            end_time=datetime.datetime.fromisoformat("2022-05-12 00:00:00"),
+        )
+    )
+    event_iter = iter(result.events)
+    event = next(event_iter)  # ignore first event
+    event = next(event_iter)
+
+    await sync.store_service.async_delete_event(
+        event_id=event.id,
+        recurring_event_id=event.recurring_event_id,
+        recurrence_range=Range.NONE,
+    )
+    assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
+        "/calendars/some-calendar-id/events/some-event-id-1_20220420",
+    ]
+    assert json_request() == [
+        {
+            "id": "some-event-id-1_20220420",
+            "status": "cancelled",
+        }
+    ]
+
+
+async def test_delete_recurring_event_and_future(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+    json_request: Callable[[], str],
+) -> None:
+    """Test deletinng future instances of a recurring event."""
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "iCalUID": "some-event-id-1@google.com",
+                    "summary": "Event 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                    "recurrence": [
+                        "FREQ=WEEKLY;COUNT=5",
+                    ],
+                }
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+    json_response({})
+    sync = await event_sync_manager_cb()
+    await sync.run()
+
+    result = await sync.store_service.async_list_events(
+        LocalListEventsRequest(
+            start_time=datetime.datetime.fromisoformat("2022-04-12 00:00:00"),
+            end_time=datetime.datetime.fromisoformat("2022-05-12 00:00:00"),
+        )
+    )
+    event_iter = iter(result.events)
+    event = next(event_iter)  # ignore first event
+    event = next(event_iter)
+    await sync.store_service.async_delete_event(
+        event_id=event.id,
+        recurring_event_id=event.recurring_event_id,
+        recurrence_range=Range.THIS_AND_FUTURE,
+    )
+    assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
+        "/calendars/some-calendar-id/events/some-event-id-1",
+    ]
+    assert json_request() == [
+        {
+            "id": "some-event-id-1",
+            "recurrence": ["FREQ=WEEKLY;UNTIL=2022-04-20;INTERVAL=1"],
+        }
+    ]
+
+
+async def test_delete_recurring_event_series(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+    json_request: Callable[[], str],
+) -> None:
+    """Test deleting an entire series of a recurring event."""
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "iCalUID": "some-event-id-1@google.com",
+                    "summary": "Event 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                    "recurrence": [
+                        "FREQ=WEEKLY;COUNT=5",
+                    ],
+                }
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+    json_response({})
+    sync = await event_sync_manager_cb()
+    await sync.run()
+
+    result = await sync.store_service.async_list_events(
+        LocalListEventsRequest(
+            start_time=datetime.datetime.fromisoformat("2022-04-12 00:00:00"),
+            end_time=datetime.datetime.fromisoformat("2022-05-12 00:00:00"),
+        )
+    )
+    event_iter = iter(result.events)
+    event = next(event_iter)  # ignore first event
+    event = next(event_iter)
+
+    await sync.store_service.async_delete_event(
+        recurring_event_id=event.recurring_event_id,
+        recurrence_range=Range.NONE,
+    )
+    assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
+        "/calendars/some-calendar-id/events/some-event-id-1",
+    ]
+    assert json_request() == []
+
+
+async def test_store_create_event_with_date(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_request: Callable[[], str],
+    url_request: Callable[[], str],
+    json_response: ApiResult,
+) -> None:
+    """Test create event API."""
+
+    start_date = datetime.date(2022, 4, 15)
+    end_date = start_date + datetime.timedelta(days=2)
+
+    event = Event(
+        summary="Summary",
+        description="Description",
+        start=DateOrDatetime(date=start_date),
+        end=DateOrDatetime(date=end_date),
+    )
+
+    json_response({})
+    sync = await event_sync_manager_cb()
+    await sync.store_service.async_add_event(event)
+    assert url_request() == [
+        "/calendars/some-calendar-id/events",
+    ]
+    assert json_request() == [
+        {
+            "summary": "Summary",
+            "description": "Description",
+            "start": {"date": "2022-04-15"},
+            "end": {"date": "2022-04-17"},
+        }
+    ]
+
+
+async def test_delete_event_not_recurring(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+) -> None:
+    """Test mistakenly specifying fields as if for a recurring event."""
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "iCalUID": "some-event-id-1@google.com",
+                    "summary": "Event 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                }
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+    sync = await event_sync_manager_cb()
+    await sync.run()
+
+    with pytest.raises(
+        ValueError, match="Specified recurrence_id but event is not recurring"
+    ):
+        await sync.store_service.async_delete_event(
+            event_id="some-event-id-1_20220420",
+            recurring_event_id="some-event-id-1",
+            recurrence_range=Range.NONE,
+        )
+
+
+async def test_delete_missing_fields(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+) -> None:
+    """Test delete api missing required fields"""
+
+    sync = await event_sync_manager_cb()
+    with pytest.raises(ValueError, match="At least one of"):
+        await sync.store_service.async_delete_event()
+
+
+async def test_delete_missing_event(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+) -> None:
+    """Test delete api missing required fields"""
+
+    sync = await event_sync_manager_cb()
+    with pytest.raises(ValueError, match="Event does not exist"):
+        await sync.store_service.async_delete_event(
+            event_id="some-event-id", recurring_event_id="some-event-id_20220820"
+        )
