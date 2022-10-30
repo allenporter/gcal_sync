@@ -100,6 +100,8 @@ def mock_app() -> aiohttp.web.Application:
     app.router.add_put("/calendars/{calendarId}/events/{eventId}", handler)
     app.router.add_patch("/calendars/{calendarId}/events/{eventId}", handler)
     app.router.add_delete("/calendars/{calendarId}/events/{eventId}", handler)
+
+    app.router.add_get("/calendars/{calendarId}/events/{eventId}/instances", handler)
     return app
 
 

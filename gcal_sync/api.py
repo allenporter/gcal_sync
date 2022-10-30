@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field, ValidationError, root_validator, validato
 from .auth import AbstractAuth
 from .const import ITEMS
 from .exceptions import ApiException
-from .model import EVENT_FIELDS, Calendar, Event, EventId, EventStatusEnum
+from .model import EVENT_FIELDS, Calendar, Event, EventStatusEnum, SyntheticEventId
 from .store import CalendarStore
 from .timeline import Timeline, calendar_timeline
 
@@ -63,6 +63,7 @@ CALENDAR_LIST_URL = "users/me/calendarList"
 CALENDAR_GET_URL = "calendars/{calendar_id}"
 CALENDAR_EVENTS_URL = "calendars/{calendar_id}/events"
 CALENDAR_EVENT_ID_URL = "calendars/{calendar_id}/events/{event_id}"
+INSTANCES_URL = "calendars/{calendar_id}/events/{event_id}/instances"
 
 
 class SyncableRequest(BaseModel):
@@ -297,6 +298,32 @@ class ListEventsResponse:
             response = ListEventsResponse(page_result)
 
 
+class EventInstancesRequest(SyncableRequest):
+    """Api request to return instances of events of calendars."""
+
+    calendar_id: str = Field(alias="calendarId")
+    """Calendar identifier."""
+
+    event_id: str = Field(alias="eventId")
+    """Recurring event identifier."""
+
+    start_time: Optional[datetime.datetime] = Field(default=None, alias="timeMin")
+    """Lower bound (exclusive) for an event's end time to filter by."""
+
+    end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
+    """Upper bound (exclusive) for an event's start time to filter by."""
+
+    max_results: int = Field(default=EVENT_PAGE_SIZE, alias="maxResults")
+    time_zone: Optional[str] = Field(default=None, alias="timeZone")
+
+
+class EventInstancesResponse(SyncableResponse):
+    """Api response to return instances of events on calendars."""
+
+    items: List[Event] = []
+    """The calendars on the user's calendar list."""
+
+
 class GoogleCalendarService:
     """Calendar service interface to Google.
 
@@ -381,7 +408,27 @@ class GoogleCalendarService:
         """Create an event on the specified calendar."""
         body = json.loads(event.json(exclude_unset=True, by_alias=True))
         await self._auth.post(
-            CALENDAR_EVENTS_URL.format(calendar_id=pathname2url(calendar_id)), json=body
+            CALENDAR_EVENTS_URL.format(calendar_id=pathname2url(calendar_id)),
+            json=body,
+        )
+
+    async def async_update_event(
+        self,
+        calendar_id: str,
+        event: Event,
+    ) -> None:
+        """Updates an event."""
+        if not event.id:
+            raise ValueError("Event had no event id field")
+        body = json.loads(
+            event.json(exclude_unset=True, exclude_none=True, by_alias=True)
+        )
+        await self._auth.request(
+            "put",
+            CALENDAR_EVENT_ID_URL.format(
+                calendar_id=pathname2url(calendar_id), event_id=pathname2url(event.id)
+            ),
+            json=body,
         )
 
     async def async_patch_event(
@@ -392,7 +439,7 @@ class GoogleCalendarService:
     ) -> None:
         """Updates an event using patch semantics, with raw API data."""
         await self._auth.request(
-            "put",
+            "patch",
             CALENDAR_EVENT_ID_URL.format(
                 calendar_id=pathname2url(calendar_id), event_id=pathname2url(event_id)
             ),
@@ -411,6 +458,29 @@ class GoogleCalendarService:
                 calendar_id=pathname2url(calendar_id), event_id=pathname2url(event_id)
             ),
         )
+
+    async def async_event_instances(
+        self,
+        request: EventInstancesRequest,
+    ) -> EventInstancesResponse:
+        """Return the instances of recurring events."""
+        params = {}
+        if request:
+            params = json.loads(
+                request.json(
+                    exclude_none=True,
+                    by_alias=True,
+                    exclude={"calendar_id", "event_id"},
+                )
+            )
+        result = await self._auth.get_json(
+            INSTANCES_URL.format(
+                calendar_id=pathname2url(request.calendar_id),
+                event_id=pathname2url(request.event_id),
+            ),
+            params=params,
+        )
+        return EventInstancesResponse.parse_obj(result)
 
 
 class LocalCalendarListResponse(BaseModel):
@@ -546,54 +616,55 @@ class CalendarEventStoreService:
 
     async def async_delete_event(
         self,
-        event_id: str,
-        recurrence_id: str | None = None,
+        event_id: str | None = None,
+        recurring_event_id: str | None = None,
         recurrence_range: Range = Range.NONE,
     ) -> None:
         """Delete the event from the calendar.
 
         This method is used to delete an existing event. For a recurring event
-        either the whole event or instances of an event may be deleted. To
-        delete the complete range of a recurring event, the `event_id` property
-        for the event must be specified and the `receurrence_id` should not
-        be specified. To delete an individual instances of the event the
-        `recurrence_id` must be specified.
+        either the whole event or instances of an event may be deleted.
 
-        You will need to take care to handle recurring events specially. A
-        recurring event created by the timeline will have a unique `event_id`
-        which will actually by the `recurrence_id` for this API. The events
-        `recurring_event_id` will be the `event_id` as it refers to the
-        original event.
+        To delete the complete range of a recurring event, the `recurring_event_id`
+        for the event must be specified and the `event_id` should not be specified.
 
-        When deleting individual instances, the range property may specify
-        if deletion of just a specific instance, or a range of instances.
+        To delete individual instances or range of instances both the `recurring_event_id`
+        and `event_id` for the instances should be specified. The `recurrence_range`
+        determines if its just the individual event (`Range.NONE`) or also including
+        events going forward (`Range.THIS_AND_FUTURE`)
 
         You should sync the event store after performing a delete operation.
         """
-        # Deleting all instances in the series
-        if not recurrence_id:
-            if EventId.parse(event_id).dtstart:
+        if not recurring_event_id:
+            if not event_id:
                 raise ValueError(
-                    "Event id was recurring event instance not original instance"
+                    "At least one of event_id and recurring_event_id must be specified"
                 )
-
+            # Deleting a single event
             await self._api.async_delete_event(self._calendar_id, event_id)
             return
 
-        parsed_recurrence_id = EventId.parse(recurrence_id)
-        if not parsed_recurrence_id.dtstart:
-            raise ValueError("Invalid recurrence_id did not reference event")
+        if not event_id:
+            # Deleting an entire series of a recurring event
+            await self._api.async_delete_event(self._calendar_id, recurring_event_id)
+            return
 
-        # Deleting one or more instances in the recurrence
-        event = await self._api.async_get_event(self._calendar_id, event_id)
+        # Both an event_id and recurring_event_id are specified, so deleting one or
+        # more instances in the recurring event series
+        event = await self._lookup_event(recurring_event_id)
+        if not event:
+            raise ValueError(f"Event does not exist: {recurring_event_id}")
         if not event.recurrence:
-            raise ValueError("Specified recurrence_id but event is not recurring")
+            raise ValueError(
+                f"Specified recurrence_id but event is not recurring: {event_id}, {recurring_event_id}"
+            )
 
+        synthetic_event_id = SyntheticEventId.parse(event_id)
         if recurrence_range == Range.NONE:
             # A single recurrence instance is removed, marked as cancelled
             cancelled_event = Event.parse_obj(
                 {
-                    "id": parsed_recurrence_id.event_id,
+                    "id": event_id,
                     "status": EventStatusEnum.CANCELLED,
                     "start": event.start,
                     "end": event.end,
@@ -602,9 +673,7 @@ class CalendarEventStoreService:
             body = json.loads(cancelled_event.json(exclude_unset=True, by_alias=True))
             del body["start"]
             del body["end"]
-            await self._api.async_patch_event(
-                self._calendar_id, parsed_recurrence_id.event_id, body
-            )
+            await self._api.async_patch_event(self._calendar_id, event_id, body)
             return
 
         # Assumes any recurrence deletion is valid, and that overwriting
@@ -615,10 +684,10 @@ class CalendarEventStoreService:
         # Stop recurring events before the specified date. This assumes that
         # setting the "util" field won't create more instances by changing count.
         rule.count = 0
-        rule.until = parsed_recurrence_id.dtstart - datetime.timedelta(seconds=1)
+        rule.until = synthetic_event_id.dtstart - datetime.timedelta(seconds=1)
         updated_event = Event.parse_obj(
             {
-                "id": event_id,
+                "id": recurring_event_id,
                 "recurrence": [rule.as_rrule_str()],
                 "start": event.start,
                 "end": event.end,
@@ -627,10 +696,18 @@ class CalendarEventStoreService:
         body = json.loads(updated_event.json(exclude_unset=True, by_alias=True))
         del body["start"]
         del body["end"]
-        await self._api.async_patch_event(self._calendar_id, event_id, body)
+        await self._api.async_patch_event(self._calendar_id, recurring_event_id, body)
 
     async def _lookup_events_data(self) -> dict[str, Any]:
-        """Find the specified event by id."""
+        """Loookup the raw events storage dictionary."""
         store_data = await self._store.async_load() or {}
         store_data.setdefault(ITEMS, {})
         return store_data.get(ITEMS, {})
+
+    async def _lookup_event(self, event_id: str) -> Event | None:
+        """Find the specified event by id in the local store."""
+        event_store_data = await self._lookup_events_data()
+        _LOGGER.debug("store_data=%s", event_store_data)
+        if event_data := event_store_data.get(event_id):
+            return Event.parse_obj(event_data)
+        return None

@@ -9,7 +9,7 @@ from itertools import islice
 import pytest
 from freezegun import freeze_time
 
-from gcal_sync.model import DateOrDatetime, Event
+from gcal_sync.model import DateOrDatetime, Event, SyntheticEventId
 from gcal_sync.timeline import Timeline, calendar_timeline
 
 
@@ -548,8 +548,13 @@ def test_recurrence_fields() -> None:
     )
     timeline_iter = iter(calendar_timeline([event]))
     event1 = next(timeline_iter)
+    assert event1.id
     assert event1.summary == "summary"
-    assert event1.id == "event-id_20220804T163000Z"
+    sid = SyntheticEventId.parse(event1.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.datetime(
+        2022, 8, 4, 16, 30, tzinfo=datetime.timezone.utc
+    )
     assert event1.start == DateOrDatetime.parse(
         datetime.datetime(
             2022, 8, 4, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
@@ -563,7 +568,12 @@ def test_recurrence_fields() -> None:
 
     event2 = next(timeline_iter)
     assert event2.summary == "summary"
-    assert event2.id == "event-id_20220805T163000Z"
+    assert event2.id
+    sid = SyntheticEventId.parse(event2.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.datetime(
+        2022, 8, 5, 16, 30, tzinfo=datetime.timezone.utc
+    )
     assert event2.start == DateOrDatetime.parse(
         datetime.datetime(
             2022, 8, 5, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
@@ -577,7 +587,12 @@ def test_recurrence_fields() -> None:
 
     event3 = next(timeline_iter)
     assert event3.summary == "summary"
-    assert event3.id == "event-id_20220806T163000Z"
+    assert event3.id
+    sid = SyntheticEventId.parse(event3.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.datetime(
+        2022, 8, 6, 16, 30, tzinfo=datetime.timezone.utc
+    )
     assert event3.start == DateOrDatetime.parse(
         datetime.datetime(
             2022, 8, 6, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
@@ -603,17 +618,26 @@ def test_all_day_recurrence_fields() -> None:
     timeline_iter = iter(calendar_timeline([event]))
     event1 = next(timeline_iter)
     assert event1.summary == "summary"
-    assert event1.id == "event-id_20220804"
+    assert event1.id
+    sid = SyntheticEventId.parse(event1.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.date(2022, 8, 4)
     assert event1.original_start_time == DateOrDatetime.parse(datetime.date(2022, 8, 4))
 
     event2 = next(timeline_iter)
     assert event2.summary == "summary"
-    assert event2.id == "event-id_20220805"
+    assert event2.id
+    sid = SyntheticEventId.parse(event2.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.date(2022, 8, 5)
     assert event2.original_start_time == DateOrDatetime.parse(datetime.date(2022, 8, 4))
 
     event3 = next(timeline_iter)
     assert event3.summary == "summary"
-    assert event3.id == "event-id_20220806"
+    assert event3.id
+    sid = SyntheticEventId.parse(event3.id)
+    assert sid.original_event_id == "event-id"
+    assert sid.dtstart == datetime.date(2022, 8, 6)
     assert event3.original_start_time == DateOrDatetime.parse(datetime.date(2022, 8, 4))
 
 

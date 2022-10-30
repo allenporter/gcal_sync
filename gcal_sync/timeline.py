@@ -21,7 +21,7 @@ from ical.iter import (
 )
 from ical.timespan import Timespan
 
-from .model import DateOrDatetime, Event, EventId
+from .model import DateOrDatetime, Event, SyntheticEventId
 
 __all__ = ["Timeline"]
 
@@ -75,12 +75,13 @@ class RecurAdapter:
         def build() -> Event:
             if not self._event.id:
                 raise ValueError("Expected event to have event id")
+            event_id = SyntheticEventId.of(self._event.id, dtstart)
             return self._event.copy(
                 deep=True,
                 update={
                     "start": DateOrDatetime.parse(dtstart),
                     "end": DateOrDatetime.parse(dtstart + self._event_duration),
-                    "id": EventId.of(self._event.id, dtstart).event_id,
+                    "id": event_id.event_id,
                     "original_start_time": self._event.start,
                     "recurring_event_id": self._event.id,
                 },

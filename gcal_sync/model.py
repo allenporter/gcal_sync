@@ -37,6 +37,7 @@ EVENT_FIELDS = (
     "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime"
 )
 MIDNIGHT = datetime.time()
+ID_DELIM = "_"
 
 
 class Calendar(BaseModel):
@@ -197,52 +198,70 @@ class Attendee(BaseModel):
     """The attendee's response status."""
 
 
-class EventId:
-    """Used to generate a recurring event id from the original event id."""
+class SyntheticEventId:
+    """Used to generate a event ids for synthetic recurring events.
+
+    A `gcal_sync.timeline.Timeline` will create synthetic events for each instance
+    of a recurring event. The API returns the original event id of the underlying
+    event as `recurring_event_id`. This class is used to create the synthetic
+    unique `event_id` that includes the date or datetime value of the event instance.
+
+    This class does not generate values in the `recurring_event_id` field.
+    """
 
     def __init__(
-        self, event_id: str, dtstart: datetime.date | datetime.datetime | None
+        self, event_id: str, dtstart: datetime.date | datetime.datetime
     ) -> None:
         self._event_id = event_id
         self._dtstart = dtstart
 
     @classmethod
     def of(  # pylint: disable=invalid-name]
-        cls, event_id: str, dtstart: datetime.date | datetime.datetime | None
-    ) -> EventId:
-        """Create a EventId based on the optional recurring id instance."""
-        return EventId(event_id, dtstart)
+        cls,
+        event_id: str,
+        dtstart: datetime.date | datetime.datetime,
+    ) -> SyntheticEventId:
+        """Create a SyntheticEventId based on the event instance."""
+        return SyntheticEventId(event_id, dtstart)
 
     @classmethod
-    def parse(cls, event_id: str) -> EventId:
-        """Parse a EventId from the event id string."""
-        parts = event_id.split("_")
-        if len(parts) == 1:
-            # Not a recurring event
-            return EventId(event_id, None)
+    def parse(cls, synthetic_event_id: str) -> SyntheticEventId:
+        """Parse a SyntheticEventId from the event id string."""
+        parts = synthetic_event_id.rsplit(ID_DELIM, maxsplit=1)
         if len(parts) != 2:
-            raise ValueError(f"EventId had invalid parts: {event_id}")
+            raise ValueError(
+                f"id was not a valid synthetic_event_id: {synthetic_event_id}"
+            )
         dtstart: datetime.date | datetime.datetime
         if len(parts[1]) != 8:
-            if parts[1][-1] != "Z":
-                raise ValueError(f"EventId had invalid timezone: {event_id}")
+            if len(parts[1]) == 0 or parts[1][-1] != "Z":
+                raise ValueError(
+                    f"SyntheticEventId had invalid date/time or timezone: {synthetic_event_id}"
+                )
 
             dtstart = datetime.datetime.strptime(
                 parts[1][:-1], "%Y%m%dT%H%M%S"
             ).replace(tzinfo=datetime.timezone.utc)
         else:
             dtstart = datetime.datetime.strptime(parts[1], "%Y%m%d").date()
-        return EventId(parts[0], dtstart)
+        return SyntheticEventId(parts[0], dtstart)
+
+    @classmethod
+    def is_valid(cls, synthetic_event_id: str) -> bool:
+        """Return true if the value is a valid SyntheticEventId string."""
+        try:
+            cls.parse(synthetic_event_id)
+        except ValueError:
+            return False
+        return True
 
     @property
     def event_id(self) -> str:
         """Return the string value of the new event id."""
-        if self._dtstart is None:
-            return self._event_id
         if isinstance(self._dtstart, datetime.datetime):
             utc = self._dtstart.astimezone(datetime.timezone.utc)
-            return f"{self._event_id}_{utc.strftime('%Y%m%dT%H%M%SZ')}"
-        return f"{self._event_id}_{self._dtstart.strftime('%Y%m%d')}"
+            return f"{self._event_id}{ID_DELIM}{utc.strftime('%Y%m%dT%H%M%SZ')}"
+        return f"{self._event_id}{ID_DELIM}{self._dtstart.strftime('%Y%m%d')}"
 
     @property
     def original_event_id(self) -> str:
@@ -250,7 +269,7 @@ class EventId:
         return self._event_id
 
     @property
-    def dtstart(self) -> datetime.date | datetime.datetime | None:
+    def dtstart(self) -> datetime.date | datetime.datetime:
         """Return the date value for the event id."""
         return self._dtstart
 
@@ -372,15 +391,6 @@ class Event(BaseModel):
         ):
             return values
         values["recurrence"] = [cls._adjust_rrule(rule, dtstart) for rule in recurrence]
-        return values
-
-    @root_validator
-    def _validate_ids(cls, values: dict[str, Any]) -> dict[str, Any]:
-        """Validates that IDs return by the API are parseable."""
-        if event_id := values.get("id"):
-            EventId.parse(event_id)
-        if recurring_event_id := values.get("recurring_event_id"):
-            EventId.parse(recurring_event_id)
         return values
 
     @classmethod
