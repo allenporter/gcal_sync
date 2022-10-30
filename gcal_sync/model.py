@@ -27,6 +27,7 @@ __all__ = [
     "VisibilityEnum",
     "ResponseStatus",
     "Attendee",
+    "AccessRole",
 ]
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,6 +39,27 @@ EVENT_FIELDS = (
 )
 MIDNIGHT = datetime.time()
 ID_DELIM = "_"
+
+
+class AccessRole(str, Enum):
+    """The effective access role of the caller."""
+
+    FREE_BUSY_READER = "freeBusyReader"
+    """Provides read access to free/busy information."""
+
+    READER = "reader"
+    """Provides read access to the calendar."""
+
+    WRITER = "writer"
+    """Provides read and write access to the calendar."""
+
+    OWNER = "owner"
+    """Provides ownership of the calendar."""
+
+    @property
+    def is_writer(self) -> bool:
+        """Return if this role can create, delete, update events."""
+        return self in (AccessRole.WRITER, AccessRole.OWNER)
 
 
 class Calendar(BaseModel):
@@ -57,6 +79,20 @@ class Calendar(BaseModel):
 
     timezone: Optional[str] = Field(alias="timeZone", default=None)
     """The time zone of the calendar."""
+
+    access_role: AccessRole = Field(alias="accessRole")
+    """The effective access role that the authenticated user has on the calendar."""
+
+    selected: bool = False
+    """Whether the calendar content shows up in the calendar UI."""
+
+    primary: bool = False
+    """Whether the calendar is the primary calendar of the authenticated user."""
+
+    class Config:
+        """Pydnatic model configuration."""
+
+        allow_population_by_field_name = True
 
 
 class DateOrDatetime(BaseModel):

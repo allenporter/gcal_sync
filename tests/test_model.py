@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from gcal_sync.model import (
     EVENT_FIELDS,
     ID_DELIM,
+    AccessRole,
     Attendee,
     Calendar,
     DateOrDatetime,
@@ -38,6 +39,7 @@ def test_calendar() -> None:
             "description": "Calendar description",
             "location": "Some location",
             "hidden": False,
+            "accessRole": "owner",
         }
     )
     assert calendar.id == "some-calendar-id"
@@ -45,6 +47,7 @@ def test_calendar() -> None:
     assert calendar.description == "Calendar description"
     assert calendar.location == "Some location"
     assert calendar.timezone is None
+    assert calendar.access_role == AccessRole.OWNER
 
 
 def test_calendar_timezone() -> None:
@@ -56,6 +59,7 @@ def test_calendar_timezone() -> None:
             "id": "some-calendar-id",
             "summary": "Calendar summary",
             "timeZone": "America/Los_Angeles",
+            "accessRole": "reader",
         }
     )
     assert calendar.id == "some-calendar-id"
@@ -63,6 +67,7 @@ def test_calendar_timezone() -> None:
     assert calendar.description is None
     assert calendar.location is None
     assert calendar.timezone == "America/Los_Angeles"
+    assert calendar.access_role == AccessRole.READER
 
 
 def test_event_with_date() -> None:
@@ -346,6 +351,7 @@ def test_event_timezone_comparison_zimetone_not_used() -> None:
                 "dateTime": "2022-05-01T21:00:00Z",
                 "timeZone": "Europe/Amsterdam",
             },
+            "accessRole": "reader",
         }
     )
     dt1 = event1.start.value
@@ -696,3 +702,17 @@ def test_invalid_event_id(event_id: str) -> None:
     """Test invalid event id values."""
     with pytest.raises(ValueError):
         SyntheticEventId.parse(event_id)
+
+
+@pytest.mark.parametrize(
+    "access_role,writer",
+    [
+        (AccessRole.FREE_BUSY_READER, False),
+        (AccessRole.READER, False),
+        (AccessRole.WRITER, True),
+        (AccessRole.OWNER, True),
+    ],
+)
+def test_access_role_writer(access_role: AccessRole, writer: bool) -> None:
+    """Test that access roles are writers."""
+    assert access_role.is_writer == writer
