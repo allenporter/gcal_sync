@@ -17,7 +17,7 @@ from gcal_sync.api import (
     SyncEventsRequest,
 )
 from gcal_sync.exceptions import ApiException, InvalidSyncTokenException
-from gcal_sync.model import EVENT_FIELDS, Calendar, DateOrDatetime, Event
+from gcal_sync.model import EVENT_FIELDS, AccessRole, Calendar, DateOrDatetime, Event
 from gcal_sync.store import CalendarStore
 from gcal_sync.sync import VERSION, CalendarEventSyncManager, CalendarListSyncManager
 
@@ -58,10 +58,12 @@ async def test_list_calendars(
                 {
                     "id": "calendar-id-1",
                     "summary": "Calendar 1",
+                    "accessRole": "reader",
                 },
                 {
                     "id": "calendar-id-2",
                     "summary": "Calendar 2",
+                    "accessRole": "owner",
                 },
             ],
             "nextSyncToken": "example-token",
@@ -73,8 +75,12 @@ async def test_list_calendars(
 
     result = await sync.store_service.async_list_calendars()
     assert result.calendars == [
-        Calendar(id="calendar-id-1", summary="Calendar 1"),
-        Calendar(id="calendar-id-2", summary="Calendar 2"),
+        Calendar(
+            id="calendar-id-1", summary="Calendar 1", access_role=AccessRole.READER
+        ),
+        Calendar(
+            id="calendar-id-2", summary="Calendar 2", access_role=AccessRole.OWNER
+        ),
     ]
 
 
@@ -91,6 +97,7 @@ async def test_list_calendars_pages(
                 {
                     "id": "calendar-id-1",
                     "summary": "Calendar 1",
+                    "access_role": "reader",
                 },
             ],
             "nextPageToken": "page-token-1",
@@ -102,6 +109,7 @@ async def test_list_calendars_pages(
                 {
                     "id": "calendar-id-2",
                     "summary": "Calendar 2",
+                    "access_role": "owner",
                 },
             ],
             "nextSyncToken": "sync-token-1",
@@ -120,6 +128,7 @@ async def test_list_calendars_pages(
                 {
                     "id": "calendar-id-3",
                     "summary": "Calendar 3",
+                    "access_role": "writer",
                 },
             ],
             "nextSyncToken": "page-token-2",
@@ -134,9 +143,15 @@ async def test_list_calendars_pages(
 
     result = await sync.store_service.async_list_calendars()
     assert result.calendars == [
-        Calendar(id="calendar-id-1", summary="Calendar 1"),
-        Calendar(id="calendar-id-2", summary="Calendar 2"),
-        Calendar(id="calendar-id-3", summary="Calendar 3"),
+        Calendar(
+            id="calendar-id-1", summary="Calendar 1", access_role=AccessRole.READER
+        ),
+        Calendar(
+            id="calendar-id-2", summary="Calendar 2", access_role=AccessRole.OWNER
+        ),
+        Calendar(
+            id="calendar-id-3", summary="Calendar 3", access_role=AccessRole.WRITER
+        ),
     ]
 
 
@@ -747,6 +762,7 @@ async def test_event_sync_recover_failure(
                 {
                     "id": "calendar-id-1",
                     "summary": "Calendar 1",
+                    "accessRole": "writer",
                 },
             ],
             "nextSyncToken": "sync-token-1",
@@ -767,7 +783,9 @@ async def test_event_sync_recover_failure(
 
     result = await sync.store_service.async_list_calendars()
     assert result.calendars == [
-        Calendar(id="calendar-id-1", summary="Calendar 1"),
+        Calendar(
+            id="calendar-id-1", summary="Calendar 1", access_role=AccessRole.WRITER
+        ),
     ]
 
     json_response(
@@ -776,6 +794,7 @@ async def test_event_sync_recover_failure(
                 {
                     "id": "calendar-id-2",
                     "summary": "Calendar 2",
+                    "accessRole": "writer",
                 },
             ],
             "nextSyncToken": "sync-token-2",
@@ -788,8 +807,12 @@ async def test_event_sync_recover_failure(
     ]
     result = await sync.store_service.async_list_calendars()
     assert result.calendars == [
-        Calendar(id="calendar-id-1", summary="Calendar 1"),
-        Calendar(id="calendar-id-2", summary="Calendar 2"),
+        Calendar(
+            id="calendar-id-1", summary="Calendar 1", access_role=AccessRole.WRITER
+        ),
+        Calendar(
+            id="calendar-id-2", summary="Calendar 2", access_role=AccessRole.WRITER
+        ),
     ]
 
 
