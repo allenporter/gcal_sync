@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field, ValidationError, root_validator, validato
 from .auth import AbstractAuth
 from .const import ITEMS
 from .exceptions import ApiException
-from .model import EVENT_FIELDS, Calendar, Event, EventStatusEnum
+from .model import EVENT_FIELDS, Calendar, Event
 from .store import CalendarStore
 from .timeline import Timeline, calendar_timeline
 
@@ -466,12 +466,7 @@ class CalendarEventStoreService:
         store_data.setdefault(ITEMS, {})
         events_data = store_data.get(ITEMS, {})
         _LOGGER.debug("Created timeline of %d events", len(events_data))
-
-        events: list[Event] = []
-        for data in events_data.values():
-            event = Event.parse_obj(data)
-            if event.status == EventStatusEnum.CANCELLED:
-                continue
-            events.append(event)
-
-        return calendar_timeline(events, tzinfo if tzinfo else datetime.timezone.utc)
+        return calendar_timeline(
+            [Event.parse_obj(data) for data in events_data.values()],
+            tzinfo if tzinfo else datetime.timezone.utc,
+        )

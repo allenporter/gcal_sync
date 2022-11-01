@@ -8,7 +8,9 @@ like returning all events happening today or after a specific date.
 from __future__ import annotations
 
 import datetime
-from collections.abc import Generator, Iterable
+import logging
+from collections.abc import Generator, Iterable, Iterator
+from typing import TypeVar, Union
 
 from ical.iter import (
     LazySortableItem,
@@ -21,9 +23,13 @@ from ical.iter import (
 )
 from ical.timespan import Timespan
 
-from .model import DateOrDatetime, Event
+from .model import DateOrDatetime, Event, EventStatusEnum
 
 __all__ = ["Timeline"]
+
+_LOGGER = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 class Timeline(SortableItemTimeline[Event]):
@@ -34,20 +40,6 @@ class Timeline(SortableItemTimeline[Event]):
 
     def __init__(self, iterable: Iterable[SortableItem[Timespan, Event]]) -> None:
         super().__init__(iterable)
-
-
-def _event_iterable(
-    iterable: list[Event], tzinfo: datetime.tzinfo
-) -> Iterable[SortableItem[Timespan, Event]]:
-    """Create a sorted iterable from the list of events."""
-
-    def sortable_items() -> Generator[SortableItem[Timespan, Event], None, None]:
-        for event in iterable:
-            if event.recurrence:
-                continue
-            yield SortableItemValue(event.timespan_of(tzinfo), event)
-
-    return SortedItemIterable(sortable_items, tzinfo)
 
 
 class RecurAdapter:
@@ -62,15 +54,11 @@ class RecurAdapter:
         """Initialize the RecurAdapter."""
         self._event = event
         self._event_duration = event.computed_duration
-        self._is_all_day = not isinstance(self._event.start.value, datetime.datetime)
 
     def get(
         self, dtstart: datetime.datetime | datetime.date
     ) -> SortableItem[Timespan, Event]:
         """Return a lazy sortable item."""
-        if self._is_all_day and isinstance(dtstart, datetime.datetime):
-            # Convert back to datetime.date if needed for the original event
-            dtstart = datetime.date.fromordinal(dtstart.toordinal())
 
         def build() -> Event:
             return self._event.copy(
@@ -89,15 +77,78 @@ class RecurAdapter:
         )
 
 
+class AllDayConverter(Iterable[Union[datetime.date, datetime.datetime]]):
+    """An iterable that converts datetimes to all days events."""
+
+    def __init__(self, dt_iter: Iterable[datetime.date | datetime.datetime]):
+        """Initialize AllDayConverter."""
+        self._dt_iter = dt_iter
+
+    def __iter__(self) -> Iterator[datetime.date | datetime.datetime]:
+        """Return an iterator with all day events converted."""
+        for value in self._dt_iter:
+            # Convert back to datetime.date if needed for the original event
+            yield datetime.date.fromordinal(value.toordinal())
+
+
+class FilteredIterable(Iterable[T]):
+    """An iterable that excludes emits values except those excluded."""
+
+    def __init__(self, func: Iterable[T], exclude: set[T] | None) -> None:
+        self._func = func
+        self._exclude = exclude
+
+    def __iter__(self) -> Iterator[T]:
+        """Return an iterator filtered by the exclusion set."""
+        for value in self._func:
+            if self._exclude is not None and value in self._exclude:
+                continue
+            yield value
+
+
 def calendar_timeline(
     events: list[Event], tzinfo: datetime.tzinfo = datetime.timezone.utc
 ) -> Timeline:
     """Create a timeline for events on a calendar, including recurrence."""
-    iters: list[Iterable[SortableItem[Timespan, Event]]] = [
-        _event_iterable(events, tzinfo=tzinfo)
-    ]
-    for event in events:
-        if not event.recurrence:
+    normal_events: list[Event] = []
+    recurring: list[Event] = []
+    recurring_skip: dict[str, set[datetime.date | datetime.datetime]] = {}
+    for data in events:
+        event = Event.parse_obj(data)
+        if event.recurring_event_id and event.original_start_time:
+            # The API returned a one-off instance of a recurring event. Keep track
+            # of the original start time which is used to filter out from the
+            # recurrence. The one-off is handled below.
+            if event.recurring_event_id in recurring_skip:
+                recurring_skip[event.recurring_event_id].add(
+                    event.original_start_time.value
+                )
+            else:
+                recurring_skip[event.recurring_event_id] = set(
+                    [event.original_start_time.value]
+                )
+
+        if event.status == EventStatusEnum.CANCELLED:
             continue
-        iters.append(RecurIterable(RecurAdapter(event).get, event.rrule))
+        if event.recurrence:
+            recurring.append(event)
+        else:
+            normal_events.append(event)
+
+    def sortable_items() -> Generator[SortableItem[Timespan, Event], None, None]:
+        nonlocal normal_events
+        for event in normal_events:
+            if event.status == EventStatusEnum.CANCELLED:
+                continue
+            yield SortableItemValue(event.timespan_of(tzinfo), event)
+
+    iters: list[Iterable[SortableItem[Timespan, Event]]] = []
+    iters.append(SortedItemIterable(sortable_items, tzinfo))
+    for event in recurring:
+        value_iter: Iterable[datetime.date | datetime.datetime] = event.rrule
+        if not isinstance(event.start.value, datetime.datetime):
+            value_iter = AllDayConverter(value_iter)
+        value_iter = FilteredIterable(value_iter, recurring_skip.get(event.id or ""))
+        iters.append(RecurIterable(RecurAdapter(event).get, value_iter))
+
     return Timeline(MergedIterable(iters))
