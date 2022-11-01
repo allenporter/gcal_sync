@@ -528,15 +528,10 @@ class CalendarEventStoreService:
         """Get the timeline of events."""
         events_data = await self._lookup_events_data()
         _LOGGER.debug("Created timeline of %d events", len(events_data))
-
-        events: list[Event] = []
-        for data in events_data.values():
-            event = Event.parse_obj(data)
-            if event.status == EventStatusEnum.CANCELLED:
-                continue
-            events.append(event)
-
-        return calendar_timeline(events, tzinfo if tzinfo else datetime.timezone.utc)
+        return calendar_timeline(
+            [Event.parse_obj(data) for data in events_data.values()],
+            tzinfo if tzinfo else datetime.timezone.utc,
+        )
 
     async def async_add_event(self, event: Event) -> None:
         """Add the specified event to the calendar.

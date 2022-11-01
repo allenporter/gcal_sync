@@ -653,3 +653,127 @@ def test_missing_event_id() -> None:
 
     with pytest.raises(ValueError, match="Expected event to have event id"):
         next(timeline_iter)
+
+
+def test_modified_recurrence() -> None:
+    """Test a recurring event that was modified with a separate event from the API."""
+    events = [
+        Event.parse_obj(
+            {
+                "id": "event-id",
+                "summary": "Summary",
+                "start": {
+                    "dateTime": "2022-06-26T16:00:00-07:00",
+                    "timeZone": "America/Los_Angeles",
+                },
+                "end": {
+                    "dateTime": "2022-06-26T19:30:00-07:00",
+                    "timeZone": "America/Los_Angeles",
+                },
+                "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=SU;COUNT=20"],
+                "iCalUID": "event-id@google.com",
+                "sequence": 1,
+            }
+        ),
+        # Second event was originally in the series above, modified to be 2 hours earlier
+        Event.parse_obj(
+            {
+                "id": "event-id_20221030T230000Z",
+                "summary": "Summary",
+                "start": {
+                    "dateTime": "2022-10-30T14:00:00-07:00",
+                    "timeZone": "America/Los_Angeles",
+                },
+                "end": {
+                    "dateTime": "2022-10-30T17:30:00-07:00",
+                    "timeZone": "America/Los_Angeles",
+                },
+                "recurringEventId": "event-id",
+                "originalStartTime": {
+                    "dateTime": "2022-10-30T16:00:00-07:00",
+                    "timeZone": "America/Los_Angeles",
+                },
+                "iCalUID": "event-id@google.com",
+                "sequence": 2,
+            }
+        ),
+    ]
+
+    timeline = calendar_timeline(events)
+    assert len(list(timeline)) == 20
+    assert len(list(timeline)) == 20  # Ensure operation is repeatable
+
+    events = list(
+        timeline.overlapping(
+            datetime.date(2022, 10, 29),
+            datetime.date(2022, 10, 31),
+        )
+    )
+    assert len(events) == 1
+
+
+def test_cancelled_recurrence_instancee() -> None:
+    """Test a recurring event with a single instance that was cancelled from the API."""
+    events = [
+        Event.parse_obj(
+            {
+                "id": "event-id",
+                "summary": "Summary",
+                "start": {
+                    "date": "2022-10-30",
+                },
+                "end": {
+                    "date": "2022-10-31",
+                },
+                "recurrence": [
+                    "RRULE:FREQ=WEEKLY;WKST=SU;BYDAY=SU;COUNT=20",
+                ],
+                "iCalUID": "event-id@google.com",
+                "sequence": 0,
+            }
+        ),
+        # Second event was originally in the series above and was cancelled
+        Event.parse_obj(
+            {
+                "id": "event-id_20221030",
+                "status": "cancelled",
+                "recurringEventId": "event-id",
+                "originalStartTime": {
+                    "date": "2022-10-30",
+                },
+            }
+        ),
+        Event.parse_obj(
+            {
+                "id": "event-id_2022113",
+                "status": "cancelled",
+                "recurringEventId": "event-id",
+                "originalStartTime": {
+                    "date": "2022-11-13",
+                },
+            }
+        ),
+    ]
+
+    timeline = calendar_timeline(events)
+    assert len(list(timeline)) == 18
+    assert len(list(timeline)) == 18  # ensure operation is repeatable
+
+    events = list(
+        timeline.overlapping(
+            datetime.date(2022, 10, 29),
+            datetime.date(2022, 11, 7),
+        )
+    )
+
+    assert len(events) == 1
+    assert events[0].start.value == datetime.date(2022, 11, 6)
+
+    # Ensure the operation is repeatable
+    events = list(
+        timeline.overlapping(
+            datetime.date(2022, 10, 29),
+            datetime.date(2022, 11, 7),
+        )
+    )
+    assert len(events) == 1
