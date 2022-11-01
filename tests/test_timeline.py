@@ -743,11 +743,21 @@ def test_cancelled_recurrence_instancee() -> None:
                 },
             }
         ),
+        Event.parse_obj(
+            {
+                "id": "event-id_2022113",
+                "status": "cancelled",
+                "recurringEventId": "event-id",
+                "originalStartTime": {
+                    "date": "2022-11-13",
+                },
+            }
+        ),
     ]
 
     timeline = calendar_timeline(events)
-    assert len(list(timeline)) == 19
-    assert len(list(timeline)) == 19  # ensure operation is repeatable
+    assert len(list(timeline)) == 18
+    assert len(list(timeline)) == 18  # ensure operation is repeatable
 
     events = list(
         timeline.overlapping(
