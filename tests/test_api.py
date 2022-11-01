@@ -547,7 +547,7 @@ async def test_delete_event(
     json_response({})
     sync = await event_sync_manager_cb()
     await sync.run()
-    await sync.store_service.async_delete_event("some-event-id-1")
+    await sync.store_service.async_delete_event(ical_uuid="some-event-id-1@google.com")
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
         "/calendars/some-calendar-id/events/some-event-id-1",
@@ -597,10 +597,10 @@ async def test_delete_recurring_event_instance(
     event_iter = iter(result.events)
     event = next(event_iter)  # ignore first event
     event = next(event_iter)
-
+    assert event.ical_uuid
     await sync.store_service.async_delete_event(
+        ical_uuid=event.ical_uuid,
         event_id=event.id,
-        recurring_event_id=event.recurring_event_id,
         recurrence_range=Range.NONE,
     )
     assert url_request() == [
@@ -657,9 +657,10 @@ async def test_delete_recurring_event_and_future(
     event_iter = iter(result.events)
     event = next(event_iter)  # ignore first event
     event = next(event_iter)
+    assert event.ical_uuid
     await sync.store_service.async_delete_event(
+        ical_uuid=event.ical_uuid,
         event_id=event.id,
-        recurring_event_id=event.recurring_event_id,
         recurrence_range=Range.THIS_AND_FUTURE,
     )
     assert url_request() == [
@@ -716,10 +717,9 @@ async def test_delete_recurring_event_series(
     event_iter = iter(result.events)
     event = next(event_iter)  # ignore first event
     event = next(event_iter)
-
+    assert event.ical_uuid
     await sync.store_service.async_delete_event(
-        recurring_event_id=event.recurring_event_id,
-        recurrence_range=Range.NONE,
+        ical_uuid=event.ical_uuid,
     )
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
@@ -762,53 +762,6 @@ async def test_store_create_event_with_date(
     ]
 
 
-async def test_delete_event_not_recurring(
-    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
-    json_response: ApiResult,
-) -> None:
-    """Test mistakenly specifying fields as if for a recurring event."""
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "some-event-id-1",
-                    "iCalUID": "some-event-id-1@google.com",
-                    "summary": "Event 1",
-                    "start": {
-                        "date": "2022-04-13",
-                    },
-                    "end": {
-                        "date": "2022-04-14",
-                    },
-                    "status": "confirmed",
-                }
-            ],
-            "nextSyncToken": "sync-token-1",
-        }
-    )
-    sync = await event_sync_manager_cb()
-    await sync.run()
-
-    with pytest.raises(
-        ValueError, match="Specified recurrence_id but event is not recurring"
-    ):
-        await sync.store_service.async_delete_event(
-            event_id="some-event-id-1_20220420",
-            recurring_event_id="some-event-id-1",
-            recurrence_range=Range.NONE,
-        )
-
-
-async def test_delete_missing_fields(
-    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
-) -> None:
-    """Test delete api missing required fields"""
-
-    sync = await event_sync_manager_cb()
-    with pytest.raises(ValueError, match="At least one of"):
-        await sync.store_service.async_delete_event()
-
-
 async def test_delete_missing_event(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
 ) -> None:
@@ -817,5 +770,6 @@ async def test_delete_missing_event(
     sync = await event_sync_manager_cb()
     with pytest.raises(ValueError, match="Event does not exist"):
         await sync.store_service.async_delete_event(
-            event_id="some-event-id", recurring_event_id="some-event-id_20220820"
+            ical_uuid="some-event-id@google.com",
+            event_id="some-event-id",
         )
