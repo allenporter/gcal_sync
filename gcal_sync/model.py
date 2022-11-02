@@ -16,7 +16,7 @@ from typing import Any, Optional, Union
 from dateutil import rrule
 from ical.timespan import Timespan
 from ical.types.recur import Recur
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, root_validator, validator
 
 __all__ = [
     "Calendar",
@@ -419,6 +419,18 @@ class Event(BaseModel):
             if visibility == "confidential":
                 values["visibility"] = "private"
         return values
+
+    @validator("recurrence", each_item=True)
+    def _validate_rrule_params(cls, rule: str) -> str:
+        """Remove rrule property parameters not supported by the dateutil.rrule library."""
+        if not rule.startswith("RRULE;"):
+            return rule
+        right = rule[6:]
+        parts = right.split(":", maxsplit=1)
+        if len(parts) == 2:
+            # Rebuild string without parameters
+            return f"RRULE:{parts[1]}"
+        return rule  # rrule parser fail
 
     @root_validator
     def _validate_rrule(cls, values: dict[str, Any]) -> dict[str, Any]:
