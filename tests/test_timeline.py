@@ -339,6 +339,20 @@ def test_today(calendar_times: Timeline) -> None:
                 ),
             ],
         ),
+        (
+            datetime.date(2022, 8, 1),
+            datetime.date(2022, 8, 2),
+            [
+                "RRULE;X-EVOLUTION-ENDDATE=20220806T200000Z:FREQ=DAILY;COUNT=5",
+            ],
+            [
+                (datetime.date(2022, 8, 1), datetime.date(2022, 8, 2)),
+                (datetime.date(2022, 8, 2), datetime.date(2022, 8, 3)),
+                (datetime.date(2022, 8, 3), datetime.date(2022, 8, 4)),
+                (datetime.date(2022, 8, 4), datetime.date(2022, 8, 5)),
+                (datetime.date(2022, 8, 5), datetime.date(2022, 8, 6)),
+            ],
+        ),
     ],
 )
 def test_day_iteration(
