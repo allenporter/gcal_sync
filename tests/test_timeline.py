@@ -420,6 +420,73 @@ def test_all_day_with_local_timezone(
     assert not start_after(local_after)
 
 
+def test_recurrence_dst_tz_iteration() -> None:
+    """Test recurrence rule across a dst boundary."""
+    event = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Summary",
+            "start": {
+                "date_time": "2022-09-09T13:00:00+02:00",
+                "timezone": "Europe/Budapest",
+            },
+            "end": {
+                "date_time": "2022-09-09T14:00:00+02:00",
+                "timezone": "Europe/Budapest",
+            },
+            "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=FR;COUNT=10"],
+        }
+    )
+    timeline = calendar_timeline([event])
+    assert [e.start.value.isoformat() for e in timeline] == [
+        "2022-09-09T13:00:00+02:00",
+        "2022-09-16T13:00:00+02:00",
+        "2022-09-23T13:00:00+02:00",
+        "2022-09-30T13:00:00+02:00",
+        "2022-10-07T13:00:00+02:00",
+        "2022-10-14T13:00:00+02:00",
+        "2022-10-21T13:00:00+02:00",
+        "2022-10-28T13:00:00+02:00",
+        "2022-11-04T13:00:00+01:00",  # First event in dst
+        "2022-11-11T13:00:00+01:00",
+    ]
+
+
+def test_recurrence_dst_tz_start_after() -> None:
+    """Test reucrrence rule 'start_after' across a dst boundary."""
+    event = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Summary",
+            "start": {
+                "date_time": "2022-09-09T13:00:00+02:00",
+                "timezone": "Europe/Budapest",
+            },
+            "end": {
+                "date_time": "2022-09-09T14:00:00+02:00",
+                "timezone": "Europe/Budapest",
+            },
+            "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=FR;COUNT=10"],
+        }
+    )
+    timeline = calendar_timeline([event])
+
+    events = timeline.start_after(
+        datetime.datetime(2022, 11, 4, 10, 00, 0, tzinfo=datetime.timezone.utc),
+    )
+    assert len(list(events)) == 2
+
+    events = timeline.start_after(
+        datetime.datetime(2022, 11, 4, 11, 59, 0, tzinfo=datetime.timezone.utc),
+    )
+    assert len(list(events)) == 2
+
+    events = timeline.start_after(
+        datetime.datetime(2022, 11, 4, 12, 0, 0, tzinfo=datetime.timezone.utc),
+    )
+    assert len(list(events)) == 1
+
+
 def test_invalid_rrule_until_datetime() -> None:
     """Test recurrence rule with mismatched UNTIL value from google api."""
     event = Event.parse_obj(

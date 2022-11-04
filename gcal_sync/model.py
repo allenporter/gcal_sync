@@ -117,12 +117,23 @@ class DateOrDatetime(BaseModel):
 
     @property
     def value(self) -> Union[datetime.date, datetime.datetime]:
-        """Return either a datetime or date representing the Datetime."""
+        """Return either a datetime or date representing the Datetime.
+
+        This only replace tzinfo/offset in the datetime when the API response did not specify one
+        separately, preferring the offset specified in the event response.
+        """
         if self.date is not None:
             return self.date
         if self.date_time is not None:
-            if self.date_time.tzinfo is None and self.timezone is not None:
-                return self.date_time.replace(tzinfo=zoneinfo.ZoneInfo(self.timezone))
+            if self.timezone is not None:
+                # Always use the timezone when there isn't one, otherwise only override when
+                # using to start recurring events. Otherwise, just use the simple offset
+                # specified in the event.
+                if self.date_time.tzinfo is None:
+                    return self.date_time.replace(
+                        tzinfo=zoneinfo.ZoneInfo(self.timezone)
+                    )
+                return self.date_time.astimezone(tz=zoneinfo.ZoneInfo(self.timezone))
             return self.date_time
         raise ValueError("Datetime has invalid state with no date or date_time")
 

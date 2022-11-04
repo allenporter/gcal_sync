@@ -344,6 +344,7 @@ def test_event_timezone_comparison_zimetone_not_used() -> None:
             "id": "some-event-id",
             "summary": "Event #2",
             "start": {
+                # Ambiguous given utc plus timezone
                 "dateTime": "2022-05-01T20:00:00Z",
                 "timeZone": "Europe/Amsterdam",
             },
@@ -362,6 +363,8 @@ def test_event_timezone_comparison_zimetone_not_used() -> None:
     assert dt1.astimezone(datetime.timezone.utc) == dt2.astimezone(
         datetime.timezone.utc
     )
+    assert event1.start.value.isoformat() == "2022-05-01T22:00:00+02:00"
+    assert event2.start.value.isoformat() == "2022-05-01T22:00:00+02:00"
 
 
 def test_event_cancelled() -> None:
