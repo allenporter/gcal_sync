@@ -629,7 +629,9 @@ def test_invalid_rrule_until_format() -> None:
 
 def test_invalid_rrule_until_time() -> None:
     """Test invalid RRULE parsing."""
-    with pytest.raises(ValidationError, match=r"Recurrence rule had invalid UNTIL.*"):
+    with pytest.raises(
+        ValidationError, match=r"Expected value to match DATE pattern.*"
+    ):
         Event.parse_obj(
             {
                 "summary": "Summary",
@@ -644,7 +646,7 @@ def test_event_fields_mask() -> None:
     """Test that all fields in the pydantic model are specified in the field mask."""
 
     assert EVENT_FIELDS == ",".join(
-        [field.alias for field in Event.__fields__.values()]
+        [field.alias for field in Event.__fields__.values() if field.alias != "recur"]
     )
 
 

@@ -5,7 +5,7 @@ coverage==6.5.0
 flake8-black==0.3.3
 flake8==5.0.4
 freezegun==1.2.2
-ical==4.1.0
+ical==4.1.1
 mypy==0.982
 pdoc==12.2.0
 pre-commit==2.20.0

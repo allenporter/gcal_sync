@@ -577,7 +577,7 @@ async def test_delete_recurring_event_instance(
                     },
                     "status": "confirmed",
                     "recurrence": [
-                        "FREQ=WEEKLY;COUNT=5",
+                        "RRULE:FREQ=WEEKLY;COUNT=5",
                     ],
                 }
             ],
@@ -637,7 +637,7 @@ async def test_delete_recurring_event_and_future(
                     },
                     "status": "confirmed",
                     "recurrence": [
-                        "FREQ=WEEKLY;COUNT=5",
+                        "RRULE:FREQ=WEEKLY;COUNT=5",
                     ],
                 }
             ],
@@ -670,7 +670,7 @@ async def test_delete_recurring_event_and_future(
     assert json_request() == [
         {
             "id": "some-event-id-1",
-            "recurrence": ["FREQ=WEEKLY;UNTIL=2022-04-20;INTERVAL=1"],
+            "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20220420"],
         }
     ]
 
@@ -697,7 +697,7 @@ async def test_delete_recurring_event_series(
                     },
                     "status": "confirmed",
                     "recurrence": [
-                        "FREQ=WEEKLY;COUNT=5",
+                        "RRULE:FREQ=WEEKLY;COUNT=5",
                     ],
                 }
             ],

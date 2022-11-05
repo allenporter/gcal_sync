@@ -600,17 +600,22 @@ class CalendarEventStoreService:
 
         # Assumes any recurrence deletion is valid, and that overwriting
         # the "until" value will not produce more instances.
-        if not (rule := event.recur):
-            raise ValueError(f"Unable to update RRULE, does not conform: {rule}")
+        if not (recur := event.recur):
+            raise ValueError(f"Unable to update RRULE, does not conform: {recur}")
+
+        if len(recur.rrule) > 1:
+            raise ValueError(f"Can't update event with multiple RRULE: {recur.rrule}")
 
         # Stop recurring events before the specified date. This assumes that
         # setting the "util" field won't create more instances by changing count.
-        rule.count = 0
-        rule.until = synthetic_event_id.dtstart - datetime.timedelta(seconds=1)
+        recur.rrule[0].count = 0
+        recur.rrule[0].until = synthetic_event_id.dtstart - datetime.timedelta(
+            seconds=1
+        )
         updated_event = Event.parse_obj(
             {
                 "id": event.id,  # Primary event
-                "recurrence": [rule.as_rrule_str()],
+                "recurrence": recur.as_recurrence(),
                 "start": event.start,
                 "end": event.end,
             }
