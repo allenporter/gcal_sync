@@ -625,7 +625,7 @@ def test_recurrence_fields() -> None:
                 2022, 8, 4, 10, 00, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
             )
         ),
-        recurrence=["RRULE:FREQ=DAILY;UNTIL=20220904"],
+        recurrence=["RRULE:FREQ=DAILY;UNTIL=20220904T000000Z"],
     )
     timeline_iter = iter(calendar_timeline([event]))
     event1 = next(timeline_iter)
@@ -858,3 +858,35 @@ def test_cancelled_recurrence_instancee() -> None:
         )
     )
     assert len(events) == 1
+
+
+def test_rdate_params() -> None:
+    """Test recurrence rule with additional parameters unsupported by dateutil.rrule"""
+
+    event = Event.parse_obj(
+        {
+            "id": "event-id",
+            "summary": "Summary",
+            "start": {
+                "date_time": "2022-07-14T10:00:00+00:00",
+                "timezone": "Europe/Helsinki",
+            },
+            "end": {
+                "date_time": "2022-07-14T11:00:00+00:00",
+                "timezone": "Europe/Helsinki",
+            },
+            "recurrence": [
+                "RDATE;TZID=Europe/Helsinki:20220210T130000,20220310T130000,20220414T130000",
+                "RRULE:FREQ=MONTHLY;UNTIL=20230309T110000Z;INTERVAL=1;BYDAY=2TH",
+            ],
+        }
+    )
+
+    timeline = calendar_timeline([event], zoneinfo.ZoneInfo("UTC"))
+    events = list(
+        timeline.overlapping(
+            datetime.date(2022, 2, 1),
+            datetime.date(2022, 4, 5),
+        )
+    )
+    assert len(events) == 2
