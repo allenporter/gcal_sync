@@ -33,6 +33,7 @@ __all__ = [
     "ResponseStatus",
     "Attendee",
     "AccessRole",
+    "CalendarBasic",
 ]
 
 _LOGGER = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ class AccessRole(str, Enum):
 
 
 class Calendar(BaseModel):
-    """Metadata associated with a calendar."""
+    """Metadata associated with a calendar from the CalendarList API."""
 
     id: str
     """Identifier of the calendar."""
@@ -93,6 +94,30 @@ class Calendar(BaseModel):
 
     primary: bool = False
     """Whether the calendar is the primary calendar of the authenticated user."""
+
+    class Config:
+        """Pydnatic model configuration."""
+
+        allow_population_by_field_name = True
+
+
+class CalendarBasic(BaseModel):
+    """Metadata associated with a calendar from the Get API."""
+
+    id: str
+    """Identifier of the calendar."""
+
+    summary: str = ""
+    """Title of the calendar."""
+
+    description: Optional[str]
+    """Description of the calendar."""
+
+    location: Optional[str]
+    """Geographic location of the calendar as free-form text."""
+
+    timezone: Optional[str] = Field(alias="timeZone", default=None)
+    """The time zone of the calendar."""
 
     class Config:
         """Pydnatic model configuration."""
