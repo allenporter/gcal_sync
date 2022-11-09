@@ -30,7 +30,14 @@ from pydantic import BaseModel, Field, ValidationError, root_validator, validato
 from .auth import AbstractAuth
 from .const import ITEMS
 from .exceptions import ApiException
-from .model import EVENT_FIELDS, Calendar, Event, EventStatusEnum, SyntheticEventId
+from .model import (
+    EVENT_FIELDS,
+    Calendar,
+    CalendarBasic,
+    Event,
+    EventStatusEnum,
+    SyntheticEventId,
+)
 from .store import CalendarStore
 from .timeline import Timeline, calendar_timeline
 
@@ -322,12 +329,12 @@ class GoogleCalendarService:
         result = await self._auth.get_json(CALENDAR_LIST_URL, params=params)
         return CalendarListResponse.parse_obj(result)
 
-    async def async_get_calendar(self, calendar_id: str) -> Calendar:
+    async def async_get_calendar(self, calendar_id: str) -> CalendarBasic:
         """Return the calendar with the specified id."""
         result = await self._auth.get_json(
             CALENDAR_GET_URL.format(calendar_id=calendar_id)
         )
-        return Calendar.parse_obj(result)
+        return CalendarBasic.parse_obj(result)
 
     async def async_get_event(self, calendar_id: str, event_id: str) -> Event:
         """Return an event based on the event id."""

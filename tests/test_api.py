@@ -12,7 +12,14 @@ from gcal_sync.api import (
     LocalListEventsRequest,
     Range,
 )
-from gcal_sync.model import EVENT_FIELDS, AccessRole, Calendar, DateOrDatetime, Event
+from gcal_sync.model import (
+    EVENT_FIELDS,
+    AccessRole,
+    Calendar,
+    CalendarBasic,
+    DateOrDatetime,
+    Event,
+)
 from gcal_sync.sync import CalendarEventSyncManager
 
 from .conftest import ApiRequest, ApiResult
@@ -37,13 +44,13 @@ async def test_get_calendar(
         {
             "id": "calendar-id-1",
             "summary": "Calendar 1",
-            "accessRole": "writer",
         },
     )
     calendar_service = await calendar_service_cb()
     result = await calendar_service.async_get_calendar("primary")
-    assert result == Calendar(
-        id="calendar-id-1", summary="Calendar 1", access_role=AccessRole.WRITER
+    assert result == CalendarBasic(
+        id="calendar-id-1",
+        summary="Calendar 1",
     )
 
     assert url_request() == ["/calendars/primary"]
