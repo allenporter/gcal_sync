@@ -159,11 +159,14 @@ class DateOrDatetime(BaseModel):
                 # Always use the timezone when there isn't one, otherwise only override when
                 # using to start recurring events. Otherwise, just use the simple offset
                 # specified in the event.
+                try:
+                    use_tzinfo = zoneinfo.ZoneInfo(self.timezone)
+                except zoneinfo.ZoneInfoNotFoundError:
+                    _LOGGER.debug("Timezone '%s' not found; ignoring", self.timezone)
+                    return self.date_time
                 if self.date_time.tzinfo is None:
-                    return self.date_time.replace(
-                        tzinfo=zoneinfo.ZoneInfo(self.timezone)
-                    )
-                return self.date_time.astimezone(tz=zoneinfo.ZoneInfo(self.timezone))
+                    return self.date_time.replace(tzinfo=use_tzinfo)
+                return self.date_time.astimezone(tz=use_tzinfo)
             return self.date_time
         raise ValueError("Datetime has invalid state with no date or date_time")
 
