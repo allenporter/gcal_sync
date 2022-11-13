@@ -890,3 +890,33 @@ def test_rdate_params() -> None:
         )
     )
     assert len(events) == 2
+
+
+def test_unknown_timezone() -> None:
+    """Test timezone evaluation when the timezone returned from the API is not known."""
+
+    event = Event.parse_obj(
+        {
+            "id": "event-id",
+            "summary": "Summary",
+            "start": {
+                "date_time": "2022-11-12T10:00:00",
+                "timezone": "GMT+02:00",
+            },
+            "end": {
+                "date_time": "2022-11-12T11:00:00",
+                "timezone": "GMT+02:00",
+            },
+        }
+    )
+
+    timeline = calendar_timeline([event], zoneinfo.ZoneInfo("UTC"))
+    events = list(
+        timeline.overlapping(
+            datetime.date(2022, 11, 1),
+            datetime.date(2022, 11, 30),
+        )
+    )
+    assert len(events) == 1
+    assert events[0].start.value == datetime.datetime(2022, 11, 12, 10, 00)
+    assert events[0].end.value == datetime.datetime(2022, 11, 12, 11, 00)
