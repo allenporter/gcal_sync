@@ -892,6 +892,81 @@ def test_rdate_params() -> None:
     assert len(events) == 2
 
 
+def test_all_day_rrule_and_rdate() -> None:
+    """Test recurrence rule with rdate and all day events."""
+
+    event = Event.parse_obj(
+        {
+            "id": "event-id",
+            "summary": "Summary",
+            "start": {
+                "date": "2022-04-19",
+            },
+            "end": {
+                "date": "2022-04-20",
+            },
+            "recurrence": [
+                "RDATE;VALUE=DATE:20221115,20221120,20221125,20221205",
+                "RRULE:FREQ=DAILY;UNTIL=20221030;INTERVAL=5",
+            ],
+        }
+    )
+
+    timeline = calendar_timeline([event], zoneinfo.ZoneInfo("UTC"))
+    events = list(
+        timeline.overlapping(
+            datetime.date(2022, 4, 1),
+            datetime.date(2022, 12, 30),
+        )
+    )
+    starts = {event.start.value for event in events}
+    assert datetime.date(2022, 4, 19) in starts
+    assert datetime.date(2022, 4, 20) not in starts
+    assert datetime.date(2022, 4, 24) in starts
+    assert datetime.date(2022, 10, 29) not in starts
+    assert datetime.date(2022, 11, 15) in starts
+    assert datetime.date(2022, 11, 16) not in starts
+    assert datetime.date(2022, 11, 20) in starts
+
+
+def test_all_day_rrule_and_exdate() -> None:
+    """Test recurrence rule with exdate."""
+
+    event = Event.parse_obj(
+        {
+            "id": "event-id",
+            "summary": "Summary",
+            "start": {
+                "date": "2022-04-19",
+            },
+            "end": {
+                "date": "2022-04-20",
+            },
+            "recurrence": [
+                "EXDATE;VALUE=DATE:20220422,20220423",
+                "RRULE:FREQ=DAILY;UNTIL=20220425",
+            ],
+        }
+    )
+
+    timeline = calendar_timeline([event], zoneinfo.ZoneInfo("UTC"))
+    events = list(
+        timeline.overlapping(
+            datetime.date(2022, 4, 1),
+            datetime.date(2022, 5, 30),
+        )
+    )
+    starts = {event.start.value for event in events}
+    assert datetime.date(2022, 4, 19) in starts
+    assert datetime.date(2022, 4, 20) in starts
+    assert datetime.date(2022, 4, 21) in starts
+    assert datetime.date(2022, 4, 22) not in starts
+    assert datetime.date(2022, 4, 23) not in starts
+    assert datetime.date(2022, 4, 24) in starts
+    assert datetime.date(2022, 4, 25) in starts
+    assert datetime.date(2022, 4, 26) not in starts
+
+
 def test_unknown_timezone() -> None:
     """Test timezone evaluation when the timezone returned from the API is not known."""
 

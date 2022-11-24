@@ -322,7 +322,7 @@ def test_event_timezone_comparison() -> None:
     assert not event1.includes(event2)
 
 
-def test_event_timezone_comparison_zimetone_not_used() -> None:
+def test_event_timezone_comparison_timetone_not_used() -> None:
     """Compare different ways the same time can be returned."""
 
     event1 = Event.parse_obj(
@@ -721,3 +721,30 @@ def test_invalid_event_id(event_id: str) -> None:
 def test_access_role_writer(access_role: AccessRole, writer: bool) -> None:
     """Test that access roles are writers."""
     assert access_role.is_writer == writer
+
+
+def test_event_timezone_with_offset() -> None:
+    """Verify the time parsing for a timezone and a date time with an offset."""
+
+    event = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Event #1",
+            "start": {
+                "dateTime": "2022-11-24T19:45:00+01:00",
+                "timeZone": "Europe/Rome",
+            },
+            "end": {
+                "dateTime": "2022-11-24T20:00:00+01:00",
+                "timeZone": "Europe/Rome",
+            },
+        }
+    )
+    assert event.start.date is None
+    assert event.start.date_time == datetime.datetime(
+        2022, 11, 24, 19, 45, tzinfo=zoneinfo.ZoneInfo("Europe/Rome")
+    )
+    assert event.start.value == datetime.datetime(
+        2022, 11, 24, 19, 45, tzinfo=zoneinfo.ZoneInfo("Europe/Rome")
+    )
+    assert event.start.value.isoformat() == "2022-11-24T19:45:00+01:00"

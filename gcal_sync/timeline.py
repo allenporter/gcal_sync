@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 import logging
 from collections.abc import Generator, Iterable, Iterator
-from typing import TypeVar, Union
+from typing import TypeVar
 
 from ical.iter import (
     LazySortableItem,
@@ -80,20 +80,6 @@ class RecurAdapter:
         )
 
 
-class AllDayConverter(Iterable[Union[datetime.date, datetime.datetime]]):
-    """An iterable that converts datetimes to all days events."""
-
-    def __init__(self, dt_iter: Iterable[datetime.date | datetime.datetime]):
-        """Initialize AllDayConverter."""
-        self._dt_iter = dt_iter
-
-    def __iter__(self) -> Iterator[datetime.date | datetime.datetime]:
-        """Return an iterator with all day events converted."""
-        for value in self._dt_iter:
-            # Convert back to datetime.date if needed for the original event
-            yield datetime.date.fromordinal(value.toordinal())
-
-
 class FilteredIterable(Iterable[T]):
     """An iterable that excludes emits values except those excluded."""
 
@@ -149,8 +135,6 @@ def calendar_timeline(
     iters.append(SortedItemIterable(sortable_items, tzinfo))
     for event in recurring:
         value_iter: Iterable[datetime.date | datetime.datetime] = event.rrule
-        if not isinstance(event.start.value, datetime.datetime):
-            value_iter = AllDayConverter(value_iter)
         value_iter = FilteredIterable(value_iter, recurring_skip.get(event.id or ""))
         iters.append(RecurIterable(RecurAdapter(event).get, value_iter))
 
