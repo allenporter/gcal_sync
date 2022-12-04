@@ -10,12 +10,12 @@ from __future__ import annotations
 import datetime
 import logging
 import zoneinfo
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from enum import Enum
 from typing import Any, Optional, Union
 
-from dateutil import rrule
 from ical.component import ComponentModel
+from ical.iter import RulesetIterable
 from ical.parsing.component import parse_content
 from ical.timespan import Timespan
 from ical.types.data_types import DATA_TYPE
@@ -353,20 +353,6 @@ class SyntheticEventId:
         return self._dtstart
 
 
-class AllDayConverter(Iterable[Union[datetime.date, datetime.datetime]]):
-    """An iterable that converts datetimes to all days events."""
-
-    def __init__(self, dt_iter: Iterable[datetime.date | datetime.datetime]):
-        """Initialize AllDayConverter."""
-        self._dt_iter = dt_iter
-
-    def __iter__(self) -> Iterator[datetime.date | datetime.datetime]:
-        """Return an iterator with all day events converted."""
-        for value in self._dt_iter:
-            # Convert back to datetime.date if needed for the original event
-            yield datetime.date.fromordinal(value.toordinal())
-
-
 class Recurrence(ComponentModel):
     """A pydantic model that captures the objects in a Google Calendar recurrence."""
 
@@ -421,26 +407,12 @@ class Recurrence(ComponentModel):
         self, dtstart: datetime.date | datetime.datetime
     ) -> Iterable[datetime.date | datetime.datetime]:
         """Return the set of recurrences as a rrule that emits start times."""
-
-        is_date: bool = not isinstance(dtstart, datetime.datetime)
-
-        ruleset = rrule.rruleset()
-        for rule in self.rrule:
-            # dateutil.rrule will convert all input values to datetime even if the
-            # input value is a date. If needed, convert back to a date so that
-            # comparisons between exdate/rdate as a date in the rruleset will
-            # be in the right format.
-            value_iter: Iterable[datetime.date | datetime.datetime] = rule.as_rrule(
-                dtstart
-            )
-            if is_date:
-                value_iter = AllDayConverter(value_iter)
-            ruleset.rrule(value_iter)  # type: ignore[arg-type]
-        for rdate in self.rdate:
-            ruleset.rdate(rdate)  # type: ignore[no-untyped-call]
-        for exdate in self.exdate:
-            ruleset.exdate(exdate)  # type: ignore[no-untyped-call]
-        return ruleset
+        return RulesetIterable(
+            dtstart,
+            [rule.as_rrule(dtstart) for rule in self.rrule],
+            self.rdate,
+            self.exdate,
+        )
 
     def as_recurrence(self) -> list[str]:
         """Serialize the recurrence rule as an API string."""
