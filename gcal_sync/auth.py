@@ -30,17 +30,21 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from http import HTTPStatus
 from typing import Any, List, Mapping, Optional
 
 import aiohttp
 from aiohttp.client_exceptions import ClientError, ClientResponseError
 
-from .exceptions import ApiException, AuthException, InvalidSyncTokenException
+from .exceptions import (
+    ApiException,
+    ApiForbiddenException,
+    AuthException,
+    InvalidSyncTokenException,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-HTTP_UNAUTHORIZED = 401
-HTTP_GONE = 410
 AUTHORIZATION_HEADER = "Authorization"
 ERROR = "error"
 STATUS = "status"
@@ -133,9 +137,13 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
         try:
             resp.raise_for_status()
         except ClientResponseError as err:
-            if err.status == HTTP_UNAUTHORIZED:
+            if err.status == HTTPStatus.FORBIDDEN:
+                raise ApiForbiddenException(
+                    f"Forbidden response from API: {err}"
+                ) from err
+            if err.status == HTTPStatus.UNAUTHORIZED:
                 raise AuthException(f"Unable to authenticate with API: {err}") from err
-            if err.status == HTTP_GONE:
+            if err.status == HTTPStatus.GONE:
                 raise InvalidSyncTokenException(
                     "Sync token invalidated by server"
                 ) from err

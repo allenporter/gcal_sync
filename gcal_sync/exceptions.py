@@ -15,3 +15,7 @@ class AuthException(ApiException):
 
 class InvalidSyncTokenException(ApiException):
     """Raised when the sync token is invalid."""
+
+
+class ApiForbiddenException(ApiException):
+    """Raised due to permission errors talking to API."""

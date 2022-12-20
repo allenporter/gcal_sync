@@ -6,7 +6,7 @@ import aiohttp
 import pytest
 
 from gcal_sync.auth import AbstractAuth
-from gcal_sync.exceptions import ApiException, AuthException
+from gcal_sync.exceptions import ApiException, ApiForbiddenException, AuthException
 
 
 async def test_request(
@@ -221,4 +221,19 @@ async def test_unavailable_error(
 
     auth = await auth_client("/path-prefix")
     with pytest.raises(ApiException):
+        await auth.get_json("some-path")
+
+
+async def test_forbidden_error(
+    app: aiohttp.web.Application, auth_client: Callable[[str], Awaitable[AbstractAuth]]
+) -> None:
+    """Test request/response handling for 403 status."""
+
+    async def handler(_: aiohttp.web.Request) -> aiohttp.web.Response:
+        return aiohttp.web.Response(status=403)
+
+    app.router.add_get("/path-prefix/some-path", handler)
+
+    auth = await auth_client("/path-prefix")
+    with pytest.raises(ApiForbiddenException):
         await auth.get_json("some-path")
