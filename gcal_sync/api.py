@@ -562,7 +562,7 @@ class CalendarEventStoreService:
         recurring events.
 
         To delete the complete range of a recurring event, the `ical_uuid` for the
-        event must be specified without a `recurrence_id`.
+        event must be specified without a `event_id`.
 
         To delete individual instances or a range of instances of a recurring event
         both the `ical_uuid` and `event_id` can be specified. The `recurrence_range`
@@ -577,6 +577,15 @@ class CalendarEventStoreService:
         event = await self._lookup_ical_uuid(ical_uuid)
         if not event or not event.id:
             raise ValueError(f"Event does not exist: {ical_uuid} or malformed")
+
+        if (
+            event_id
+            and recurrence_range == Range.THIS_AND_FUTURE
+            and SyntheticEventId.parse(event_id).dtstart == event.start.value
+        ):
+            # Editing the first instance and all forward is the same as deleting
+            # the entire series so don't bother forking a new event
+            event_id = None
 
         if not event_id or not event.recurrence:
             # Deleting a single event or entire series of a recurring event
@@ -614,11 +623,12 @@ class CalendarEventStoreService:
             raise ValueError(f"Can't update event with multiple RRULE: {recur.rrule}")
 
         # Stop recurring events before the specified date. This assumes that
-        # setting the "util" field won't create more instances by changing count.
+        # setting the "until" field won't create more instances by changing count.
+        # UNTIL is inclusive so it can't include the specified exdate. FREQ=DAILY
+        # is the lowest frequency supported so subtracting one day is
+        # safe and works for both dates and datetimes.
         recur.rrule[0].count = 0
-        recur.rrule[0].until = synthetic_event_id.dtstart - datetime.timedelta(
-            seconds=1
-        )
+        recur.rrule[0].until = synthetic_event_id.dtstart - datetime.timedelta(days=1)
         updated_event = Event.parse_obj(
             {
                 "id": event.id,  # Primary event
