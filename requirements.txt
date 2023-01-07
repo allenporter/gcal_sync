@@ -7,7 +7,7 @@ flake8==5.0.4
 freezegun==1.2.2
 ical==4.2.8
 mypy==0.991
-pdoc==12.3.0
+pdoc==12.3.1
 pre-commit==2.21.0
 pydantic==1.10.4
 pylint==2.15.9
