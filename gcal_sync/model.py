@@ -544,32 +544,44 @@ class Event(BaseModel):
             return values
         for rule in recur.rrule:
             cls._adjust_rrule(rule, dtstart)
+        recur.exdate = [
+            cls._adjust_recurrence_date(exdate, dtstart) for exdate in recur.exdate
+        ]
+        recur.rdate = [
+            cls._adjust_recurrence_date(rdate, dtstart) for rdate in recur.rdate
+        ]
         return values
 
     @classmethod
     def _adjust_rrule(cls, rule: Recur, dtstart: DateOrDatetime) -> Recur:
         """Apply fixes to the rrule."""
-        if not rule.until:
-            return rule
+        if rule.until:
+            rule.until = cls._adjust_recurrence_date(rule.until, dtstart)
+        return rule
 
+    @classmethod
+    def _adjust_recurrence_date(
+        cls, date_value: datetime.datetime | datetime.date, dtstart: DateOrDatetime
+    ) -> datetime.datetime | datetime.date:
+        """Apply fixes to the recurrence rule date."""
         if dtstart.date_time:
-            if dtstart.date_time and not isinstance(rule.until, datetime.datetime):
+            if not isinstance(date_value, datetime.datetime):
                 # Convert a date to a datetime
-                rule.until = datetime.datetime.fromordinal(
-                    rule.until.toordinal()
-                ).replace(tzinfo=dtstart.date_time.tzinfo)
-            elif (
+                return datetime.datetime.fromordinal(date_value.toordinal()).replace(
+                    tzinfo=dtstart.date_time.tzinfo
+                )
+            if (
                 dtstart.date_time.tzinfo is None
-                and isinstance(rule.until, datetime.datetime)
-                and rule.until.tzinfo is not None
+                and isinstance(date_value, datetime.datetime)
+                and date_value.tzinfo is not None
             ):
                 # Date should be floating
-                rule.until = rule.until.replace(tzinfo=None)
+                return date_value.replace(tzinfo=None)
         elif dtstart.date:
-            if isinstance(rule.until, datetime.datetime):
+            if isinstance(date_value, datetime.datetime):
                 # UNTIL is a DATE-TIME but must be a DATE
-                rule.until = rule.until.date()
-        return rule
+                return date_value.date()
+        return date_value
 
     @property
     def timespan(self) -> Timespan:

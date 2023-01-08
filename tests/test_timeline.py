@@ -1,5 +1,7 @@
 """Tests for iterating over events on a timeline."""
 
+# pylint: disable=too-many-lines
+
 from __future__ import annotations
 
 import datetime
@@ -503,6 +505,50 @@ def test_invalid_rrule_until_datetime() -> None:
         (datetime.date(2012, 11, 27), datetime.date(2012, 11, 28)),
         (datetime.date(2012, 12, 4), datetime.date(2012, 12, 5)),
         (datetime.date(2012, 12, 11), datetime.date(2012, 12, 12)),
+    ]
+
+
+def test_invalid_rrule_until_datetime_exdate() -> None:
+    """Test recurrence rule with mismatched EXDATE value from google api."""
+    event = Event.parse_obj(
+        {
+            "id": "event-id",
+            "summary": "Summary",
+            "start": {"date": "2012-11-27"},
+            "end": {"date": "2012-11-28"},
+            "recurrence": [
+                "EXDATE;TZID=Europe/Helsinki:20121204T000000",
+                "RRULE:FREQ=WEEKLY;UNTIL=20130225T000000Z;BYDAY=TU",
+            ],
+        }
+    )
+    timeline = calendar_timeline([event])
+    assert [(e.start.value, e.end.value) for e in islice(timeline, 3)] == [
+        (datetime.date(2012, 11, 27), datetime.date(2012, 11, 28)),
+        (datetime.date(2012, 12, 11), datetime.date(2012, 12, 12)),
+        (datetime.date(2012, 12, 18), datetime.date(2012, 12, 19)),
+    ]
+
+
+def test_invalid_rrule_until_datetime_rate() -> None:
+    """Test recurrence rule with mismatched RDATE value from google api."""
+    event = Event.parse_obj(
+        {
+            "id": "event-id",
+            "summary": "Summary",
+            "start": {"date": "2012-11-27"},
+            "end": {"date": "2012-11-28"},
+            "recurrence": [
+                "RDATE;TZID=Europe/Helsinki:20121203T000000",
+                "RRULE:FREQ=WEEKLY;UNTIL=20130225T000000Z;BYDAY=TU",
+            ],
+        }
+    )
+    timeline = calendar_timeline([event])
+    assert [(e.start.value, e.end.value) for e in islice(timeline, 3)] == [
+        (datetime.date(2012, 11, 27), datetime.date(2012, 11, 28)),
+        (datetime.date(2012, 12, 3), datetime.date(2012, 12, 4)),
+        (datetime.date(2012, 12, 4), datetime.date(2012, 12, 5)),
     ]
 
 
