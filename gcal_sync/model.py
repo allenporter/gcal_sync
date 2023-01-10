@@ -19,7 +19,7 @@ from ical.iter import RulesetIterable
 from ical.parsing.component import parse_content
 from ical.timespan import Timespan
 from ical.types.data_types import DATA_TYPE
-from ical.types.recur import Recur
+from ical.types.recur import Frequency, Recur
 from pydantic import BaseModel, Field, root_validator
 
 __all__ = [
@@ -557,6 +557,12 @@ class Event(BaseModel):
         """Apply fixes to the rrule."""
         if rule.until:
             rule.until = cls._adjust_recurrence_date(rule.until, dtstart)
+        if rule.freq == Frequency.YEARLY and rule.by_month_day and not rule.by_month:
+            # A FREQ=YEARLY;BYMONTHDAY=N rule is ambiguous and expanded
+            # differently by google calendar vs dateutil.rrule. Add a
+            # BYMONTH=Y to make it more explicitl.
+            _LOGGER.debug("Correcting BYMONTHDAY rule: %s", rule)
+            rule.by_month = [dtstart.value.month]
         return rule
 
     @classmethod

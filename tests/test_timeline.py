@@ -1041,3 +1041,24 @@ def test_unknown_timezone() -> None:
     assert len(events) == 1
     assert events[0].start.value == datetime.datetime(2022, 11, 12, 10, 00)
     assert events[0].end.value == datetime.datetime(2022, 11, 12, 11, 00)
+
+
+def test_yearly_bymonthday_rrule() -> None:
+    """Test FREQ=YEARLY rules returned from the API with BYMONTHDAY rules."""
+    event = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Summary",
+            "start": {"date": "2022-09-07"},
+            "end": {
+                "date": "2022-09-08",
+            },
+            "recurrence": ["RRULE:FREQ=YEARLY;BYMONTHDAY=7;COUNT=3"],
+        }
+    )
+    timeline = calendar_timeline([event])
+    assert [e.start.value.isoformat() for e in timeline] == [
+        "2022-09-07",
+        "2023-09-07",
+        "2024-09-07",
+    ]
