@@ -76,10 +76,10 @@ class Calendar(BaseModel):
     summary: str = ""
     """Title of the calendar."""
 
-    description: Optional[str]
+    description: Optional[str] = None
     """Description of the calendar."""
 
-    location: Optional[str]
+    location: Optional[str] = None
     """Geographic location of the calendar as free-form text."""
 
     timezone: Optional[str] = Field(alias="timeZone", default=None)
@@ -109,10 +109,10 @@ class CalendarBasic(BaseModel):
     summary: str = ""
     """Title of the calendar."""
 
-    description: Optional[str]
+    description: Optional[str] = None
     """Description of the calendar."""
 
-    location: Optional[str]
+    location: Optional[str] = None
     """Geographic location of the calendar as free-form text."""
 
     timezone: Optional[str] = Field(alias="timeZone", default=None)
@@ -449,10 +449,10 @@ class Event(BaseModel):
     end: DateOrDatetime
     """The (exclusive) end time of the event."""
 
-    description: Optional[str]
+    description: Optional[str] = None
     """Description of the event, which can contain HTML."""
 
-    location: Optional[str]
+    location: Optional[str] = None
     """Geographic location of the event as free-form text."""
 
     transparency: str = Field(default="opaque")

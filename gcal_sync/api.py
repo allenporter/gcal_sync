@@ -452,7 +452,7 @@ class LocalListEventsRequest(BaseModel):
 class LocalListEventsResponse(BaseModel):
     """Api response containing a list of events."""
 
-    events: List[Event] = Field(default=[])
+    events: List[Event] = Field(default_factory=list)
     """Events returned from the local store."""
 
 
