@@ -748,3 +748,25 @@ def test_event_timezone_with_offset() -> None:
         2022, 11, 24, 19, 45, tzinfo=zoneinfo.ZoneInfo("Europe/Rome")
     )
     assert event.start.value.isoformat() == "2022-11-24T19:45:00+01:00"
+
+
+def test_all_day_event() -> None:
+    """Verify that all day events with invalid durations are fixed."""
+
+    event = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Event #1",
+            "start": {
+                "date": "2022-11-24",
+            },
+            "end": {
+                "date": "2022-11-24",  # Invalid end date
+            },
+        }
+    )
+    assert event.timespan.duration == datetime.timedelta(days=1)
+    assert event.start.date == datetime.date(2022, 11, 24)
+    assert event.start.value.isoformat() == "2022-11-24"
+    assert event.end.date == datetime.date(2022, 11, 25)
+    assert event.end.value.isoformat() == "2022-11-25"
