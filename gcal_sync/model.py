@@ -537,6 +537,22 @@ class Event(BaseModel):
         return values
 
     @root_validator
+    def _adjust_duration(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Fix events with invalid durations."""
+        _LOGGER.debug("_adjust_duration")
+        if (
+            (dtstart := values.get("start"))
+            and (dtend := values.get("end"))
+            and dtstart.date
+            and dtend.date
+            and ((dtend.date - dtstart.date) <= datetime.timedelta(days=0))
+        ):
+            # Duration is zero or negative. Default to 1 day
+            dtend.date = dtstart.date + datetime.timedelta(days=1)
+            values["end"] = dtend
+        return values
+
+    @root_validator
     def _validate_rrule(cls, values: dict[str, Any]) -> dict[str, Any]:
         """The API returns invalid RRULEs that need to be coerced to valid."""
         # Rules may need updating of start time has a timezone
