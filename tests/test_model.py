@@ -750,7 +750,7 @@ def test_event_timezone_with_offset() -> None:
     assert event.start.value.isoformat() == "2022-11-24T19:45:00+01:00"
 
 
-def test_all_day_event() -> None:
+def test_invalid_all_day_event_duration() -> None:
     """Verify that all day events with invalid durations are fixed."""
 
     event = Event.parse_obj(
@@ -770,3 +770,41 @@ def test_all_day_event() -> None:
     assert event.start.value.isoformat() == "2022-11-24"
     assert event.end.date == datetime.date(2022, 11, 25)
     assert event.end.value.isoformat() == "2022-11-25"
+
+
+def test_invalid_event_duration() -> None:
+    """Verify that all day events with invalid durations are fixed."""
+
+    event = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Event #1",
+            "start": {
+                "dateTime": "2022-04-12T16:30:00-08:00",
+            },
+            "end": {
+                "dateTime": "2022-04-12T16:30:00-08:00",  # Invalid end date
+            },
+        }
+    )
+    assert event.id == "some-event-id"
+    tzinfo = datetime.timezone(datetime.timedelta(hours=-8))
+
+    assert event.start
+    assert event.start.date is None
+    assert event.start.date_time
+    assert event.start.date_time == datetime.datetime(
+        2022, 4, 12, 16, 30, 0, tzinfo=tzinfo
+    )
+    assert event.start.timezone is None
+    assert event.start.value == datetime.datetime(2022, 4, 12, 16, 30, 0, tzinfo=tzinfo)
+
+    assert event.end
+    assert event.end.date is None
+    assert event.end.date_time == datetime.datetime(
+        2022, 4, 12, 17, 0, 0, tzinfo=tzinfo
+    )
+    assert event.end.timezone is None
+    assert event.end.value == datetime.datetime(2022, 4, 12, 17, 0, 0, tzinfo=tzinfo)
+
+    assert event.timespan.duration == datetime.timedelta(minutes=30)
