@@ -31,6 +31,9 @@ __all__ = [
     "VisibilityEnum",
     "ResponseStatus",
     "Attendee",
+    "Reminders",
+    "ReminderOverride",
+    "ReminderMethod",
     "AccessRole",
     "CalendarBasic",
 ]
@@ -40,7 +43,8 @@ _LOGGER = logging.getLogger(__name__)
 DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
     "id,iCalUID,summary,start,end,description,location,transparency,status,eventType,"
-    "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime"
+    "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime,"
+    "reminders"
 )
 MIDNIGHT = datetime.time()
 ID_DELIM = "_"
@@ -426,6 +430,40 @@ class Recurrence(ComponentModel):
         allow_population_by_field_name = True
 
 
+class ReminderMethod(str, Enum):
+    """The method to use to send a reminder."""
+
+    EMAIL = "email"
+    """Reminders are sent via email."""
+
+    POPUP = "popup"
+    """Reminders are sent via a UI popup."""
+
+
+class ReminderOverride(BaseModel):
+    """Reminder settings to use instead of calendar default."""
+
+    method: ReminderMethod
+    """The method used by this reminder."""
+
+    minutes: int
+    """Number of minutes before the start of the event to trigger."""
+
+
+class Reminders(BaseModel):
+    """Information about the event's reminders for the authenticated user."""
+
+    use_default: bool = Field(alias="useDefault", default=False)
+
+    overrides: list[ReminderOverride] = Field(default_factory=list)
+    """Reminders to use instead of the default reminders.
+
+    If the event doesn't use the default reminders, this lists the reminders
+    specific to the event, or, if not set, indicates that no reminders are
+    set for this event. The maximum number of override reminders is 5.
+    """
+
+
 class Event(BaseModel):
     """A single event on a calendar."""
 
@@ -496,6 +534,8 @@ class Event(BaseModel):
         alias="originalStartTime", default=None
     )
     """A unique identifier for when this event would start in the original recurring event."""
+
+    reminders: Optional[Reminders] = None
 
     @property
     def computed_duration(self) -> datetime.timedelta:

@@ -19,6 +19,8 @@ from gcal_sync.model import (
     Event,
     EventStatusEnum,
     EventTypeEnum,
+    ReminderMethod,
+    ReminderOverride,
     ResponseStatus,
     SyntheticEventId,
     VisibilityEnum,
@@ -808,3 +810,45 @@ def test_invalid_event_duration() -> None:
     assert event.end.value == datetime.datetime(2022, 4, 12, 17, 0, 0, tzinfo=tzinfo)
 
     assert event.timespan.duration == datetime.timedelta(minutes=30)
+
+
+def test_reminders() -> None:
+    """Test event reminders."""
+
+    event = Event.parse_obj(
+        {
+            "id": "some-event-id",
+            "summary": "Event summary",
+            "start": {
+                "date": "2022-04-12",
+            },
+            "end": {
+                "date": "2022-04-13",
+            },
+            "reminders": {
+                "useDefault": True,
+                "overrides": [
+                    {
+                        "method": "email",
+                        "minutes": 5,
+                    },
+                    {
+                        "method": "popup",
+                        "minutes": 3,
+                    },
+                ],
+            },
+        }
+    )
+    assert event.reminders
+    assert event.reminders.use_default
+    assert event.reminders.overrides == [
+        ReminderOverride(
+            method=ReminderMethod.EMAIL,
+            minutes=5,
+        ),
+        ReminderOverride(
+            method=ReminderMethod.POPUP,
+            minutes=3,
+        ),
+    ]

@@ -19,6 +19,9 @@ from gcal_sync.model import (
     CalendarBasic,
     DateOrDatetime,
     Event,
+    ReminderMethod,
+    ReminderOverride,
+    Reminders,
 )
 from gcal_sync.sync import CalendarEventSyncManager
 
@@ -835,3 +838,40 @@ async def test_delete_missing_event(
             ical_uuid="some-event-id@google.com",
             event_id="some-event-id",
         )
+
+
+async def test_create_event_with_reminder(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    json_request: ApiRequest,
+) -> None:
+    """Test create event API when setting a reminder."""
+
+    start_date = datetime.date(2022, 4, 15)
+    end_date = start_date + datetime.timedelta(days=2)
+
+    event = Event(
+        summary="Summary",
+        description="Description",
+        start=DateOrDatetime(date=start_date),
+        end=DateOrDatetime(date=end_date),
+        reminders=Reminders(
+            overrides=[
+                ReminderOverride(
+                    method=ReminderMethod.POPUP,
+                    minutes=7,
+                )
+            ],
+        ),
+    )
+
+    calendar_service = await calendar_service_cb()
+    await calendar_service.async_create_event("calendar-id", event)
+    assert json_request() == [
+        {
+            "summary": "Summary",
+            "description": "Description",
+            "start": {"date": "2022-04-15"},
+            "end": {"date": "2022-04-17"},
+            "reminders": {"overrides": [{"method": "popup", "minutes": 7}]},
+        }
+    ]
