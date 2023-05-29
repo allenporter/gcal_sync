@@ -44,7 +44,7 @@ DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
     "id,iCalUID,summary,start,end,description,location,transparency,status,eventType,"
     "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime,"
-    "reminders"
+    "reminders","color"
 )
 MIDNIGHT = datetime.time()
 ID_DELIM = "_"
@@ -536,7 +536,10 @@ class Event(BaseModel):
     """A unique identifier for when this event would start in the original recurring event."""
 
     reminders: Optional[Reminders] = None
-
+        
+    color: Optional[str] = Field(alias"colorId", default=None)
+    """Color of the event."""
+        
     @property
     def computed_duration(self) -> datetime.timedelta:
         """Return the event duration."""
