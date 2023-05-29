@@ -537,7 +537,7 @@ class Event(BaseModel):
 
     reminders: Optional[Reminders] = None
         
-    color: Optional[str] = Field(alias"colorId", default=None)
+    color: Optional[str] = Field(alias="colorId", default=None)
     """Color of the event."""
         
     @property
