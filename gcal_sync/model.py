@@ -44,7 +44,7 @@ DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
     "id,iCalUID,summary,start,end,description,location,transparency,status,eventType,"
     "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime,"
-    "reminders","colorId"
+    "reminders,colorId"
 )
 MIDNIGHT = datetime.time()
 ID_DELIM = "_"
