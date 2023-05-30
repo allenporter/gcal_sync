@@ -44,7 +44,7 @@ DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
     "id,iCalUID,summary,start,end,description,location,transparency,status,eventType,"
     "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime,"
-    "reminders","color"
+    "reminders","colorId"
 )
 MIDNIGHT = datetime.time()
 ID_DELIM = "_"
@@ -537,7 +537,7 @@ class Event(BaseModel):
 
     reminders: Optional[Reminders] = None
         
-    color: Optional[str] = Field(alias="colorId", default=None)
+    color_id: Optional[str] = Field(alias="colorId", default=None)
     """Color of the event."""
         
     @property
