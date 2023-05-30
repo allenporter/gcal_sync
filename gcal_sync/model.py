@@ -536,10 +536,10 @@ class Event(BaseModel):
     """A unique identifier for when this event would start in the original recurring event."""
 
     reminders: Optional[Reminders] = None
-        
+
     color_id: Optional[str] = Field(alias="colorId", default=None)
     """Color of the event."""
-        
+
     @property
     def computed_duration(self) -> datetime.timedelta:
         """Return the event duration."""
