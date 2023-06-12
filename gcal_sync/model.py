@@ -453,7 +453,7 @@ class ReminderOverride(BaseModel):
 class Reminders(BaseModel):
     """Information about the event's reminders for the authenticated user."""
 
-    use_default: bool = Field(alias="useDefault", default=False)
+    use_default: bool = Field(alias="useDefault", default=True)
 
     overrides: list[ReminderOverride] = Field(default_factory=list)
     """Reminders to use instead of the default reminders.
