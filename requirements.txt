@@ -1,3 +1,4 @@
+-e .
 aiohttp==3.8.4
 black==23.7.0
 click==8.1.5
@@ -5,7 +6,7 @@ coverage==7.2.7
 flake8-black==0.3.6
 flake8==6.0.0
 freezegun==1.2.2
-ical==4.5.4
+ical==5.0.0
 mypy==1.4.1
 pdoc==14.0.0
 pre-commit==3.3.3
