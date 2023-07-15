@@ -10,9 +10,10 @@ library for more details on how to
 async down calendars and events to local storage.
 
 All of the request and response messages here use [pydantic](https://pydantic-docs.helpmanual.io/)
-for parsing and valdation of the constraints of the API. The API fields in the request and
-response methods are mirroring the Google Calendar API methods, so see the
-[reference](https://developers.google.com/calendar/api/v3/reference) for details.
+for parsing and valdation of the constraints of the API. The API fields in the
+request and response methods are mirroring the Google Calendar API methods, so
+see the [reference](https://developers.google.com/calendar/api/v3/reference)
+for details.
 """
 
 from __future__ import annotations
@@ -171,10 +172,10 @@ class ListEventsRequest(SyncableRequest):
 class SyncEventsRequest(ListEventsRequest):
     """Api request to list events when used in the context of sync.
 
-    This differs from a normal ListEventsRequest in that it handles differences between
-    initial sync and follow up syncs with a sync token (which has fewer fields allowed). This
-    also does not expand recurring events into single events since the local event store
-    handles this.
+    This differs from a normal ListEventsRequest in that it handles differences
+    between initial sync and follow up syncs with a sync token (which has fewer
+    fields allowed). This also does not expand recurring events into single
+    events since the local event store handles this.
     """
 
     def to_request(self) -> _RawListEventsRequest:
