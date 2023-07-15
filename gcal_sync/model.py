@@ -12,7 +12,7 @@ import logging
 import zoneinfo
 from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 from ical.component import ComponentModel
 from ical.iter import RulesetIterable
@@ -405,7 +405,7 @@ class Recurrence(ComponentModel):
             ]
         )
         component = parse_content("\n".join(content))
-        return cls.parse_obj(component[0].as_dict())
+        return cast(Recurrence, cls.parse_obj(component[0].as_dict()))
 
     def as_rrule(
         self, dtstart: datetime.date | datetime.datetime
