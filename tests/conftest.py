@@ -49,12 +49,6 @@ class RefreshingAuth(AbstractAuth):
         return json_value["token"]
 
 
-@pytest.fixture(name="event_loop")
-def create_event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Fixture for producing event loop."""
-    yield asyncio.get_event_loop()
-
-
 async def handler(request: aiohttp.web.Request) -> aiohttp.web.Response:
     """Handles the request, inserting response prepared by tests."""
     if request.method != "GET":
