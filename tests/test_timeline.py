@@ -128,7 +128,7 @@ def test_iteration(timeline: Timeline) -> None:
 
 
 def test_date_and_datetimes() -> None:
-    """Test chronological iteration of a timeline with all day and non-all day events."""
+    """Test chronological iteration of timeline with all day/non-all day events."""
     timeline = calendar_timeline(
         [
             Event.parse_obj(
@@ -802,7 +802,7 @@ def test_modified_recurrence() -> None:
                 "sequence": 1,
             }
         ),
-        # Second event was originally in the series above, modified to be 2 hours earlier
+        # Second event was originally in series above, modified as 2 hours earlier
         Event.parse_obj(
             {
                 "id": "event-id_20221030T230000Z",
