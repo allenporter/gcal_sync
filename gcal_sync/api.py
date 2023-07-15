@@ -26,7 +26,16 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, List, Optional, cast
 from urllib.request import pathname2url
 
-from pydantic import BaseModel, Field, ValidationError, root_validator, validator
+try:
+    from pydantic.v1 import BaseModel, Field, ValidationError, root_validator, validator
+except ImportError:
+    from pydantic import (  # type: ignore
+        BaseModel,
+        Field,
+        ValidationError,
+        root_validator,
+        validator,
+    )
 
 from .auth import AbstractAuth
 from .const import ITEMS

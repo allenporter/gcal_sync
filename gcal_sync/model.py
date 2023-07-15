@@ -12,7 +12,7 @@ import logging
 import zoneinfo
 from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, Union
 
 from ical.component import ComponentModel
 from ical.iter import RulesetIterable
@@ -20,7 +20,11 @@ from ical.parsing.component import parse_content
 from ical.timespan import Timespan
 from ical.types.data_types import DATA_TYPE
 from ical.types.recur import Frequency, Recur
-from pydantic import BaseModel, Field, root_validator
+
+try:
+    from pydantic.v1 import BaseModel, Field, root_validator
+except ImportError:
+    from pydantic import BaseModel, Field, root_validator  # type: ignore
 
 __all__ = [
     "Calendar",
@@ -409,7 +413,7 @@ class Recurrence(ComponentModel):
             ]
         )
         component = parse_content("\n".join(content))
-        return cast(Recurrence, cls.parse_obj(component[0].as_dict()))
+        return cls.parse_obj(component[0].as_dict())
 
     def as_rrule(
         self, dtstart: datetime.date | datetime.datetime
