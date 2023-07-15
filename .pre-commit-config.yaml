@@ -23,7 +23,7 @@ repos:
     name: mypy
     entry: "./run-mypy"
     language: python
-    additional_dependencies: ["mypy==0.930"]
+    additional_dependencies: ["mypy==1.4.1"]
     types: [python]
     # use require_serial so that script
     # is only called once per commit
