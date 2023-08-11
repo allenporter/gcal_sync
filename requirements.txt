@@ -5,7 +5,7 @@ click==8.1.6
 coverage==7.2.7
 freezegun==1.2.2
 ical==5.0.0
-mypy==1.4.1
+mypy==1.5.0
 pdoc==14.0.0
 pre-commit==3.3.3
 pydantic==2.1.1
