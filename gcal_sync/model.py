@@ -577,6 +577,19 @@ class Event(BaseModel):
         return values
 
     @root_validator(pre=True)
+    def _adjust_invalid_recurrence_rules(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Fix invalid rrule parameters not supported by dateutil.rrule."""
+        if not (recurrence_values := values.get("recurrence")):
+            return values
+        updated = []
+        for recurrence_value in recurrence_values:
+            if recurrence_value.startswith("DATE;"):
+                recurrence_value = recurrence_value.replace("DATE;", "RDATE;")
+            updated.append(recurrence_value)
+        values["recurrence"] = updated
+        return values
+
+    @root_validator(pre=True)
     def _validate_recur(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Remove rrule property parameters not supported by dateutil.rrule."""
         if not values.get("recurrence"):

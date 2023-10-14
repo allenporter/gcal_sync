@@ -606,6 +606,32 @@ def test_invalid_rrule_until_local_datetime() -> None:
     ]
 
 
+def test_invalid_rrule_until_spurios_date() -> None:
+    """Test recurrence rule with mismatched UNTIL value from google api."""
+    event = Event.parse_obj(
+        {
+            "id": "event-id",
+            "summary": "Summary",
+            "start": {"date": "2023-08-02"},
+            "end": {"date": "2023-08-01"},
+            "recurrence": [
+                "DATE;TZID=Europe/Warsaw:20230818T020000,20230915T020000,20231013T020000,20231110T010000,20231208T010000"
+            ],
+        }
+    )
+    timeline = calendar_timeline([event])
+    assert [(e.start.value, e.end.value) for e in islice(timeline, 6)] == [
+        (datetime.date(2023, 8, 18), datetime.date(2023, 8, 19)),
+        (datetime.date(2023, 9, 15), datetime.date(2023, 9, 16)),
+        (datetime.date(2023, 10, 13), datetime.date(2023, 10, 14)),
+        (datetime.date(2023, 11, 10), datetime.date(2023, 11, 11)),
+        (datetime.date(2023, 12, 8), datetime.date(2023, 12, 9)),
+    ]
+    assert event.recurrence == [
+        "RDATE;TZID=Europe/Warsaw:20230818T020000,20230915T020000,20231013T020000,20231110T010000,20231208T010000"
+    ]
+
+
 @pytest.mark.parametrize(
     "time_zone,event_order",
     [
