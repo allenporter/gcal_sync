@@ -656,7 +656,7 @@ class CalendarEventStoreService:
         """Loookup the raw events storage dictionary."""
         store_data = await self._store.async_load() or {}
         store_data.setdefault(ITEMS, {})
-        return store_data.get(ITEMS, {})
+        return store_data.get(ITEMS, {})  # type: ignore[no-any-return]
 
     async def _lookup_ical_uuid(self, ical_uuid: str) -> Event | None:
         """Find the specified event by id in the local store."""
