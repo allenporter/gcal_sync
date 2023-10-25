@@ -9,7 +9,7 @@ mypy==1.6.1
 pdoc==14.1.0
 pre-commit==3.5.0
 pydantic==2.4.2
-pytest==7.4.2
+pytest==7.4.3
 pytest-aiohttp==1.0.5
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
