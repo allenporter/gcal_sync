@@ -1,6 +1,6 @@
 -e .
 aiohttp==3.8.6
-black==23.10.1
+black==23.11.0
 click==8.1.7
 coverage==7.3.2
 freezegun==1.2.2
