@@ -102,8 +102,7 @@ def calendar_timeline(
     normal_events: list[Event] = []
     recurring: list[Event] = []
     recurring_skip: dict[str, set[datetime.date | datetime.datetime]] = {}
-    for data in events:
-        event = Event.parse_obj(data)
+    for event in events:
         if event.recurring_event_id and event.original_start_time:
             # The API returned a one-off instance of a recurring event. Keep track
             # of the original start time which is used to filter out from the

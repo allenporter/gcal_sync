@@ -27,21 +27,19 @@ from typing import Any, List, Optional, cast
 from urllib.request import pathname2url
 
 try:
-    from pydantic.v1 import BaseModel, Field, ValidationError, root_validator, validator
+    from pydantic.v1 import Field, root_validator, validator
 except ImportError:
     from pydantic import (  # type: ignore
-        BaseModel,
         Field,
-        ValidationError,
         root_validator,
         validator,
     )
 
 from .auth import AbstractAuth
 from .const import ITEMS
-from .exceptions import ApiException
 from .model import (
     EVENT_FIELDS,
+    CalendarBaseModel,
     Calendar,
     CalendarBasic,
     Event,
@@ -83,7 +81,7 @@ CALENDAR_EVENT_ID_URL = "calendars/{calendar_id}/events/{event_id}"
 INSTANCES_URL = "calendars/{calendar_id}/events/{event_id}/instances"
 
 
-class SyncableRequest(BaseModel):
+class SyncableRequest(CalendarBaseModel):
     """Base class for a request that supports sync."""
 
     page_token: Optional[str] = Field(default=None, alias="pageToken")
@@ -93,7 +91,7 @@ class SyncableRequest(BaseModel):
     """Token obtained from the last page of results of a previous request."""
 
 
-class SyncableResponse(BaseModel):
+class SyncableResponse(CalendarBaseModel):
     """Base class for an API response that supports sync."""
 
     page_token: Optional[str] = Field(default=None, alias="nextPageToken")
@@ -216,7 +214,7 @@ class Boolean(str, enum.Enum):
     FALSE = "false"
 
 
-class _RawListEventsRequest(BaseModel):
+class _RawListEventsRequest(CalendarBaseModel):
     """Api request to list events.
 
     This is used internally to have separate validation between list event requests
@@ -337,14 +335,14 @@ class GoogleCalendarService:
         if request:
             params = json.loads(request.json(exclude_none=True, by_alias=True))
         result = await self._auth.get_json(CALENDAR_LIST_URL, params=params)
-        return CalendarListResponse.parse_obj(result)
+        return CalendarListResponse(**result)
 
     async def async_get_calendar(self, calendar_id: str) -> CalendarBasic:
         """Return the calendar with the specified id."""
         result = await self._auth.get_json(
             CALENDAR_GET_URL.format(calendar_id=calendar_id)
         )
-        return CalendarBasic.parse_obj(result)
+        return CalendarBasic(**result)
 
     async def async_get_event(self, calendar_id: str, event_id: str) -> Event:
         """Return an event based on the event id."""
@@ -353,7 +351,7 @@ class GoogleCalendarService:
                 calendar_id=pathname2url(calendar_id), event_id=pathname2url(event_id)
             )
         )
-        return Event.parse_obj(result)
+        return Event(**result)
 
     async def async_list_events(
         self,
@@ -385,11 +383,7 @@ class GoogleCalendarService:
             params=params,
         )
         _ListEventsResponseModel.update_forward_refs()
-        try:
-            return _ListEventsResponseModel.parse_obj(result)
-        except ValidationError as err:
-            _LOGGER.debug("Unable to parse result: %s", result)
-            raise ApiException("Error parsing API response") from err
+        return _ListEventsResponseModel(**result)
 
     async def async_create_event(
         self,
@@ -432,14 +426,14 @@ class GoogleCalendarService:
         )
 
 
-class LocalCalendarListResponse(BaseModel):
+class LocalCalendarListResponse(CalendarBaseModel):
     """Api response containing a list of calendars."""
 
     calendars: List[Calendar] = []
     """The list of calendars."""
 
 
-class LocalListEventsRequest(BaseModel):
+class LocalListEventsRequest(CalendarBaseModel):
     """Api request to list events from the local event store."""
 
     start_time: datetime.datetime = Field(default_factory=now)
@@ -459,7 +453,7 @@ class LocalListEventsRequest(BaseModel):
         allow_population_by_field_name = True
 
 
-class LocalListEventsResponse(BaseModel):
+class LocalListEventsResponse(CalendarBaseModel):
     """Api response containing a list of events."""
 
     events: List[Event] = Field(default_factory=list)
@@ -482,7 +476,7 @@ class CalendarListStoreService:
         items = store_data.get(ITEMS, {})
 
         return LocalCalendarListResponse(
-            calendars=[Calendar.parse_obj(item) for item in items.values()]
+            calendars=[Calendar(**item) for item in items.values()]
         )
 
 
@@ -546,7 +540,7 @@ class CalendarEventStoreService:
         events_data = await self._lookup_events_data()
         _LOGGER.debug("Created timeline of %d events", len(events_data))
         return calendar_timeline(
-            [Event.parse_obj(data) for data in events_data.values()],
+            [Event(**data) for data in events_data.values()],
             tzinfo if tzinfo else datetime.timezone.utc,
         )
 
@@ -610,13 +604,11 @@ class CalendarEventStoreService:
 
         if recurrence_range == Range.NONE:
             # A single recurrence instance is removed, marked as cancelled
-            cancelled_event = Event.parse_obj(
-                {
-                    "id": event_id,  # Event instance
-                    "status": EventStatusEnum.CANCELLED,
-                    "start": event.start,
-                    "end": event.end,
-                }
+            cancelled_event = Event(
+                id=event_id,  # Event instance
+                status=EventStatusEnum.CANCELLED,
+                start=event.start,
+                end=event.end,
             )
             body = json.loads(cancelled_event.json(exclude_unset=True, by_alias=True))
             del body["start"]
@@ -639,13 +631,11 @@ class CalendarEventStoreService:
         # safe and works for both dates and datetimes.
         recur.rrule[0].count = 0
         recur.rrule[0].until = synthetic_event_id.dtstart - datetime.timedelta(days=1)
-        updated_event = Event.parse_obj(
-            {
-                "id": event.id,  # Primary event
-                "recurrence": recur.as_recurrence(),
-                "start": event.start,
-                "end": event.end,
-            }
+        updated_event = Event(
+            id=event.id,  # Primary event
+            recurrence=recur.as_recurrence(),
+            start=event.start,
+            end=event.end,
         )
         body = json.loads(updated_event.json(exclude_unset=True, by_alias=True))
         del body["start"]
@@ -663,5 +653,5 @@ class CalendarEventStoreService:
         events_data = await self._lookup_events_data()
         for data in events_data.values():
             if (event_uuid := data.get("ical_uuid")) and event_uuid == ical_uuid:
-                return Event.parse_obj(data)
+                return Event(**data)
         return None
