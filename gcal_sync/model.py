@@ -22,9 +22,11 @@ from ical.types.data_types import DATA_TYPE
 from ical.types.recur import Frequency, Recur
 
 try:
-    from pydantic.v1 import BaseModel, Field, root_validator
+    from pydantic.v1 import BaseModel, Field, root_validator, ValidationError
 except ImportError:
-    from pydantic import BaseModel, Field, root_validator  # type: ignore
+    from pydantic import BaseModel, Field, root_validator, ValidationError  # type: ignore
+
+from .exceptions import CalendarParseException
 
 __all__ = [
     "Calendar",
@@ -75,7 +77,17 @@ class AccessRole(str, Enum):
         return self in (AccessRole.WRITER, AccessRole.OWNER)
 
 
-class Calendar(BaseModel):
+class CalendarBaseModel(BaseModel):
+    """Base class for calendar models."""
+
+    def __init__(self, **data: Any) -> None:
+        try:
+            super().__init__(**data)
+        except ValidationError as err:
+            raise CalendarParseException(f"Failed to parse component: {err}") from err
+
+
+class Calendar(CalendarBaseModel):
     """Metadata associated with a calendar from the CalendarList API."""
 
     id: str
@@ -108,7 +120,7 @@ class Calendar(BaseModel):
         allow_population_by_field_name = True
 
 
-class CalendarBasic(BaseModel):
+class CalendarBasic(CalendarBaseModel):
     """Metadata associated with a calendar from the Get API."""
 
     id: str
@@ -132,7 +144,7 @@ class CalendarBasic(BaseModel):
         allow_population_by_field_name = True
 
 
-class DateOrDatetime(BaseModel):
+class DateOrDatetime(CalendarBaseModel):
     """A date or datetime."""
 
     date: Optional[datetime.date] = Field(default=None)
@@ -262,7 +274,7 @@ class ResponseStatus(str, Enum):
     """The attendee has accepted the invitation."""
 
 
-class Attendee(BaseModel):
+class Attendee(CalendarBaseModel):
     """An attendee of an event."""
 
     id: Optional[str] = None
@@ -413,7 +425,10 @@ class Recurrence(ComponentModel):
             ]
         )
         component = parse_content("\n".join(content))
-        return cls.parse_obj(component[0].as_dict())
+        try:
+            return cls.parse_obj(component[0].as_dict())
+        except ValidationError as err:
+            raise CalendarParseException(err) from err
 
     def as_rrule(
         self, dtstart: datetime.date | datetime.datetime
@@ -448,7 +463,7 @@ class ReminderMethod(str, Enum):
     """Reminders are sent via a UI popup."""
 
 
-class ReminderOverride(BaseModel):
+class ReminderOverride(CalendarBaseModel):
     """Reminder settings to use instead of calendar default."""
 
     method: ReminderMethod
@@ -458,7 +473,7 @@ class ReminderOverride(BaseModel):
     """Number of minutes before the start of the event to trigger."""
 
 
-class Reminders(BaseModel):
+class Reminders(CalendarBaseModel):
     """Information about the event's reminders for the authenticated user."""
 
     use_default: bool = Field(alias="useDefault", default=True)
@@ -472,7 +487,7 @@ class Reminders(BaseModel):
     """
 
 
-class Event(BaseModel):
+class Event(CalendarBaseModel):
     """A single event on a calendar."""
 
     id: Optional[str] = None

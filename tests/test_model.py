@@ -8,11 +8,6 @@ import zoneinfo
 
 import pytest
 
-try:
-    from pydantic.v1 import ValidationError
-except ImportError:
-    from pydantic import ValidationError  # type: ignore
-
 from gcal_sync.model import (
     EVENT_FIELDS,
     ID_DELIM,
@@ -29,6 +24,7 @@ from gcal_sync.model import (
     SyntheticEventId,
     VisibilityEnum,
 )
+from gcal_sync.exceptions import CalendarParseException
 
 SUMMARY = "test summary"
 LOS_ANGELES = zoneinfo.ZoneInfo("America/Los_Angeles")
@@ -168,7 +164,7 @@ def test_invalid_datetime() -> None:
         },
     }
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(CalendarParseException):
         Event.parse_obj(
             {
                 **base_event,
@@ -176,7 +172,7 @@ def test_invalid_datetime() -> None:
             }
         )
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(CalendarParseException):
         Event.parse_obj(
             {
                 **base_event,
@@ -184,7 +180,7 @@ def test_invalid_datetime() -> None:
             }
         )
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(CalendarParseException):
         Event.parse_obj(
             {
                 **base_event,
@@ -392,7 +388,7 @@ def test_event_cancelled() -> None:
 def test_required_fields() -> None:
     """Exercise required fields for normal non-deleted events."""
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(CalendarParseException):
         Event.parse_obj(
             {
                 "id": "some-event-id",
@@ -621,7 +617,7 @@ def test_comparisons(
 def test_invalid_rrule_until_format() -> None:
     """Test invalid RRULE parsing."""
     with pytest.raises(
-        ValidationError, match=r"Recurrence rule had unexpected format.*"
+        CalendarParseException, match=r"Recurrence rule had unexpected format.*"
     ):
         Event.parse_obj(
             {
@@ -636,7 +632,7 @@ def test_invalid_rrule_until_format() -> None:
 def test_invalid_rrule_until_time() -> None:
     """Test invalid RRULE parsing."""
     with pytest.raises(
-        ValidationError, match=r"Expected value to match DATE pattern.*"
+        CalendarParseException, match=r"Expected value to match DATE pattern.*"
     ):
         Event.parse_obj(
             {

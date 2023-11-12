@@ -19,3 +19,7 @@ class InvalidSyncTokenException(ApiException):
 
 class ApiForbiddenException(ApiException):
     """Raised due to permission errors talking to API."""
+
+
+class CalendarParseException(ApiException):
+    """Raised when parsing a calendar event fails."""
