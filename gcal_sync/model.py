@@ -15,6 +15,7 @@ from enum import Enum
 from typing import Any, Optional, Union
 
 from ical.component import ComponentModel
+from ical.exceptions import CalendarParseError
 from ical.iter import RulesetIterable
 from ical.parsing.component import parse_content
 from ical.timespan import Timespan
@@ -609,7 +610,10 @@ class Event(CalendarBaseModel):
         """Remove rrule property parameters not supported by dateutil.rrule."""
         if not values.get("recurrence"):
             return values
-        values["recur"] = Recurrence.from_recurrence(values["recurrence"])
+        try:
+            values["recur"] = Recurrence.from_recurrence(values["recurrence"])
+        except CalendarParseError as err:
+            raise ValueError(f"Failed to parse recurrence: {err}") from err
         return values
 
     @root_validator
