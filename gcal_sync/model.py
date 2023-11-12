@@ -599,8 +599,10 @@ class Event(CalendarBaseModel):
             return values
         updated = []
         for recurrence_value in recurrence_values:
-            if recurrence_value.startswith("DATE;"):
-                recurrence_value = recurrence_value.replace("DATE;", "RDATE;")
+            if recurrence_value.startswith("RRULE:DATE;"):
+                recurrence_value = "RDATE;" + recurrence_value.removeprefix(
+                    "RRULE:DATE;"
+                )
             updated.append(recurrence_value)
         values["recurrence"] = updated
         return values
