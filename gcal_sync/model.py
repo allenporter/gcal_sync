@@ -574,6 +574,24 @@ class Event(CalendarBaseModel):
         return self.recur.as_rrule(self.start.value)
 
     @root_validator(pre=True)
+    def _remove_self(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Rename any 'self' fields from all child values of the dictionary."""
+
+        if "self" in values:
+            values["self_"] = values["self"]
+            del values["self"]
+
+        # Mutate any children with "self" fields
+        for v in values.values():
+            if isinstance(v, dict):
+                cls._remove_self(v)
+            elif isinstance(v, list) and len(v) > 1 and isinstance(v[0], dict):
+                for item in v:
+                    cls._remove_self(item)
+
+        return values
+
+    @root_validator(pre=True)
     def _allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Special case for canceled event tombstones missing required fields."""
         if status := values.get("status"):
