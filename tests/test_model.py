@@ -469,12 +469,19 @@ def test_attendees() -> None:
             "end": {
                 "date": "2022-04-13",
             },
+            "creator": {
+                "id": "creator-1",
+                "email": "example0@example.com",
+                "displayName": "Example 0",
+                "self": "False",
+            },
             "attendees": [
                 {
                     "id": "attendee-id-1",
                     "email": "example1@example.com",
                     "displayName": "Example 1",
                     "comment": "comment 1",
+                    "self": True,
                 },
                 {
                     "id": "attendee-id-2",
