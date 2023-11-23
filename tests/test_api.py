@@ -875,3 +875,41 @@ async def test_create_event_with_reminder(
             "reminders": {"overrides": [{"method": "popup", "minutes": 7}]},
         }
     ]
+
+
+async def test_api_self_response(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+    json_request: Callable[[], str],
+) -> None:
+    """Test api responses with reserved keywords."""
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "iCalUID": "some-event-id-1@google.com",
+                    "summary": "Event 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                    "attendees": [
+                        {
+                            "email": "example@example.com",
+                            "self": True,
+                            "responseStatus": "tentative",
+                        }
+                    ],
+                }
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+    json_response({})
+    sync = await event_sync_manager_cb()
+    await sync.run()

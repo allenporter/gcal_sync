@@ -82,10 +82,29 @@ class CalendarBaseModel(BaseModel):
     """Base class for calendar models."""
 
     def __init__(self, **data: Any) -> None:
+        """Initialize the model."""
         try:
             super().__init__(**data)
         except ValidationError as err:
             raise CalendarParseException(f"Failed to parse component: {err}") from err
+
+    @root_validator(pre=True)
+    def _remove_self(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Rename any 'self' fields from all child values of the dictionary."""
+        if "self" in values:
+            values["self_"] = values["self"]
+            del values["self"]
+
+        # Mutate any children with "self" fields
+        updates = {}
+        for k, v in values.items():
+            if isinstance(v, dict):
+                updates[k] = cls._remove_self(v)
+            elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+                updates[k] = [cls._remove_self(item) for item in v]
+        values.update(updates)
+
+        return values
 
 
 class Calendar(CalendarBaseModel):
@@ -572,24 +591,6 @@ class Event(CalendarBaseModel):
         if len(self.recurrence) == 0 or not self.recur:
             return []
         return self.recur.as_rrule(self.start.value)
-
-    @root_validator(pre=True)
-    def _remove_self(cls, values: dict[str, Any]) -> dict[str, Any]:
-        """Rename any 'self' fields from all child values of the dictionary."""
-
-        if "self" in values:
-            values["self_"] = values["self"]
-            del values["self"]
-
-        # Mutate any children with "self" fields
-        for v in values.values():
-            if isinstance(v, dict):
-                cls._remove_self(v)
-            elif isinstance(v, list) and len(v) > 1 and isinstance(v[0], dict):
-                for item in v:
-                    cls._remove_self(item)
-
-        return values
 
     @root_validator(pre=True)
     def _allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
