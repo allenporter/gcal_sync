@@ -6,7 +6,7 @@ coverage==7.4.0
 freezegun==1.4.0
 ical==6.1.1
 mypy==1.8.0
-pdoc==14.3.0
+pdoc==14.4.0
 pre-commit==3.6.0
 pydantic==2.5.3
 pytest==7.4.4
