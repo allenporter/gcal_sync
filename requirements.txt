@@ -2,7 +2,7 @@
 aiohttp==3.9.3
 black==24.2.0
 click==8.1.7
-coverage==7.4.2
+coverage==7.4.3
 freezegun==1.4.0
 ical==6.1.1
 mypy==1.8.0
