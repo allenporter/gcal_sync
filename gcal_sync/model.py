@@ -264,6 +264,9 @@ class EventTypeEnum(str, Enum):
     FOCUS_TIME = "focusTime"
     """A focus-time event."""
 
+    WORKING_LOCATION = "workingLocation"
+    """An event at a specific location."""
+
 
 class VisibilityEnum(str, Enum):
     """Visibility of the event."""
