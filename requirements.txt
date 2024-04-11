@@ -1,5 +1,5 @@
 -e .
-aiohttp==3.9.3
+aiohttp==3.9.4
 black==24.3.0
 click==8.1.7
 coverage==7.4.4
