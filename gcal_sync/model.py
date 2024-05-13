@@ -1,6 +1,6 @@
 """Library for data model for local calendar objects.
 
-This librayr contains [pydantic](https://pydantic-docs.helpmanual.io/) models
+This library contains [pydantic](https://pydantic-docs.helpmanual.io/) models
 for the Google Calendar API data model. These objects support all methods for
 parsing and serialization supported by pydnatic.
 """

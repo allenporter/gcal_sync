@@ -7,7 +7,7 @@ use OAuth, which involves things like redirecting a user to a web flow, and
 redirecting back with an access token.
 
 An example implementation of `gcal_sync.AbstractAuth` would need to handle things like
-passin in the access token and any other necessary OAuth token refreshes when the
+passing in the access token and any other necessary OAuth token refreshes when the
 access token has expired.
 
 ```python
@@ -155,7 +155,7 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
 
     @staticmethod
     async def _error_detail(resp: aiohttp.ClientResponse) -> List[str]:
-        """Resturns an error message string from the APi response."""
+        """Returns an error message string from the APi response."""
         if resp.status < 400:
             return []
         try:

@@ -1,4 +1,5 @@
 {
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:base"
   ],
@@ -11,5 +12,8 @@
       "matchUpdateTypes": ["minor", "patch"]
     }
   ],
-  "pre-commit": {"enabled": true},
+  "pip_requirements": {
+    "fileMatch": ["requirements_dev.txt"]
+  },
+  "pre-commit": {"enabled": true}
 }

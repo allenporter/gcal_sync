@@ -10,7 +10,7 @@ library for more details on how to
 async down calendars and events to local storage.
 
 All of the request and response messages here use [pydantic](https://pydantic-docs.helpmanual.io/)
-for parsing and valdation of the constraints of the API. The API fields in the
+for parsing and validation of the constraints of the API. The API fields in the
 request and response methods are mirroring the Google Calendar API methods, so
 see the [reference](https://developers.google.com/calendar/api/v3/reference)
 for details.
@@ -280,8 +280,9 @@ class ListEventsResponse:
     def __init__(
         self,
         model: _ListEventsResponseModel,
-        get_next_page: Callable[[str | None], Awaitable[_ListEventsResponseModel]]
-        | None = None,
+        get_next_page: (
+            Callable[[str | None], Awaitable[_ListEventsResponseModel]] | None
+        ) = None,
     ) -> None:
         """initialize ListEventsResponse."""
         self._model = model
@@ -573,7 +574,7 @@ class CalendarEventStoreService:
         determines if its just the individual event (`Range.NONE`) or also including
         events going forward (`Range.THIS_AND_FUTURE`)
 
-        The local store may be used in some scenarios to deterine the appropriate
+        The local store may be used in some scenarios to determine the appropriate
         commands to send to the calendar API, so it may be operating on stale data.
         You should sync the event store after performing a delete operation to
         ensure the store reflects the latest information from the server
