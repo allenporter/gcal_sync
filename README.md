@@ -10,12 +10,12 @@ should be easy to extend to do more as needed.
 # Quickstart
 
 In order to use the library, you'll need to do some work yourself to get authentication
-credentails. This depends a lot on the context (e.g. redirecting to use OAuth via web)
+credentials. This depends a lot on the context (e.g. redirecting to use OAuth via web)
 but should be easy to incorporate using Google's python authentication libraries. See
 Google's [Authentication and authorization overview](https://developers.google.com/workspace/guides/auth-overview) for details.
 
 You will implement `gcal_sync.AbstractAuth` to provide an access token. Your implementation
-will handle any necessary refreshes. You can invoke the service with your auth implentation
+will handle any necessary refreshes. You can invoke the service with your auth implementation
 to access the API.
 
 ```python

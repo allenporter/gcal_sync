@@ -1,4 +1,5 @@
 """Test fixtures for calendar API."""
+
 from __future__ import annotations
 
 import asyncio
@@ -36,7 +37,7 @@ class FakeAuth(AbstractAuth):  # pylint: disable=too-few-public-methods
 
 
 class RefreshingAuth(AbstractAuth):
-    """Implementaiton of AbstractAuth for sending RPCs."""
+    """Implementation of AbstractAuth for sending RPCs."""
 
     def __init__(self, test_client: TestClient) -> None:
         super().__init__(cast(aiohttp.ClientSession, test_client), "")
@@ -68,9 +69,9 @@ async def handler(request: aiohttp.web.Request) -> aiohttp.web.Response:
 
 
 @pytest.fixture
-async def request_handler() -> Callable[
-    [aiohttp.web.Request], Awaitable[aiohttp.web.Response]
-]:
+async def request_handler() -> (
+    Callable[[aiohttp.web.Request], Awaitable[aiohttp.web.Response]]
+):
     """A fake request handler."""
     return handler
 
@@ -206,7 +207,7 @@ def mock_json_request(app: aiohttp.web.Application) -> ApiRequest:
 
 @pytest.fixture(name="post_body")
 def mock_post_body(app: aiohttp.web.Application) -> Callable[[], list[str]]:
-    """Fixture to return the recieved post body."""
+    """Fixture to return the received post body."""
 
     def _get_request() -> list[str]:
         return cast(List[str], app["request-post"])

@@ -7,10 +7,10 @@ The idea is to replace the current google calendar APIs with support for local s
 Goals:
 - Improve availability of calendar data, removing some reliance on cloud
 - Improve performance, reducing overhead of API calls
-- Improve consistency across calendar entity attribtues (e.g. state, event fetch)
+- Improve consistency across calendar entity attributes (e.g. state, event fetch)
 
 Non-Goals:
-- Will not improve availabilty of mutate operations
+- Will not improve availability of mutate operations
 - No bi-directional sync
 - Local calendar support
 - Resolve issues in calendar entity state (e.g. concurrent events)
