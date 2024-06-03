@@ -1,6 +1,7 @@
 [tool.mypy]
 plugins = "pydantic.v1.mypy"
 exclude = [
+  "setup.py",
   "venv/",
 ]
 platform = "linux"
