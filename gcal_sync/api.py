@@ -544,16 +544,13 @@ class CalendarEventStoreService:
         events_data = await self._lookup_events_data()
         _LOGGER.debug("Created timeline of %d events", len(events_data))
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
-        def create_event_objects() -> list[Event]:
-            return [Event(**data) for data in events_data.values()]
+        def create_calendar_timeline() -> Timeline:
+            event_objects = [Event(**data) for data in events_data.values()]
+            return calendar_timeline(event_objects, tzinfo)
 
-        event_objects = await loop.run_in_executor(None, create_event_objects)
-
-        return await loop.run_in_executor(
-            None, calendar_timeline, event_objects, tzinfo
-        )
+        return await loop.run_in_executor(None, create_calendar_timeline)
 
     async def async_add_event(self, event: Event) -> None:
         """Add the specified event to the calendar.
