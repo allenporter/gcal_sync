@@ -265,7 +265,10 @@ class EventTypeEnum(str, Enum):
     """A focus-time event."""
 
     WORKING_LOCATION = "workingLocation"
-    """An event at a specific location."""
+    """A working location event."""
+
+    FROM_GMAIL = "fromGmail"
+    """An event from Gmail."""
 
 
 class VisibilityEnum(str, Enum):
