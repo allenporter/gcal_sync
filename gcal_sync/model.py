@@ -47,6 +47,16 @@ __all__ = [
 
 _LOGGER = logging.getLogger(__name__)
 
+# Pre-load all timezones to avoid blocking calls in async methods later. Catch
+# any exceptions and make this best effort.
+_tz_refs = set({})
+for tz in zoneinfo.available_timezones():
+    try:
+        _tz_refs.add(zoneinfo.ZoneInfo(tz))
+    except zoneinfo.ZoneInfoNotFoundError:
+        pass
+
+
 DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
     "id,iCalUID,summary,start,end,description,location,transparency,status,eventType,"
