@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from functools import cache
 import zoneinfo
 from collections.abc import Iterable
 from enum import Enum
@@ -47,15 +48,6 @@ __all__ = [
 
 _LOGGER = logging.getLogger(__name__)
 
-# Pre-load all timezones to avoid blocking calls in async methods later. Catch
-# any exceptions and make this best effort.
-_tz_refs = set({})
-for tz in zoneinfo.available_timezones():
-    try:
-        _tz_refs.add(zoneinfo.ZoneInfo(tz))
-    except zoneinfo.ZoneInfoNotFoundError:
-        pass
-
 
 DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
@@ -65,6 +57,21 @@ EVENT_FIELDS = (
 )
 MIDNIGHT = datetime.time()
 ID_DELIM = "_"
+
+
+@cache
+def _create_zoneinfo(tz: str) -> zoneinfo.ZoneInfo:
+    """Create a zoneinfo object for the given timezone."""
+    return zoneinfo.ZoneInfo(tz)
+
+
+# Pre-load all timezones to avoid blocking calls in async methods later. Catch
+# any exceptions and make this best effort.
+for tz in zoneinfo.available_timezones():
+    try:
+        _create_zoneinfo(tz)
+    except zoneinfo.ZoneInfoNotFoundError:
+        pass
 
 
 class AccessRole(str, Enum):
@@ -210,7 +217,7 @@ class DateOrDatetime(CalendarBaseModel):
                 # override when using to start recurring events. Otherwise, just
                 # use the simple offset specified in the event.
                 try:
-                    use_tzinfo = zoneinfo.ZoneInfo(self.timezone)
+                    use_tzinfo = _create_zoneinfo(self.timezone)
                 except zoneinfo.ZoneInfoNotFoundError:
                     _LOGGER.debug("Timezone '%s' not found; ignoring", self.timezone)
                     return self.date_time
