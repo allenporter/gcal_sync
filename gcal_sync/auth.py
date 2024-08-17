@@ -31,7 +31,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from http import HTTPStatus
-from typing import Any, List, Mapping, Optional
+from typing import Any, List
 
 import aiohttp
 from aiohttp.client_exceptions import ClientError, ClientResponseError
@@ -71,7 +71,7 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
         """Return a valid access token."""
 
     async def request(
-        self, method: str, url: str, **kwargs: Optional[Mapping[str, Any]]
+        self, method: str, url: str, **kwargs: Any
     ) -> aiohttp.ClientResponse:
         """Make a request."""
         try:
@@ -86,9 +86,7 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
             _LOGGER.debug("request[post json]=%s", kwargs["json"])
         return await self._websession.request(method, url, **kwargs, headers=headers)
 
-    async def get(
-        self, url: str, **kwargs: Mapping[str, Any]
-    ) -> aiohttp.ClientResponse:
+    async def get(self, url: str, **kwargs: Any) -> aiohttp.ClientResponse:
         """Make a get request."""
         try:
             resp = await self.request("get", url, **kwargs)
@@ -96,7 +94,7 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
             raise ApiException(f"Error connecting to API: {err}") from err
         return await AbstractAuth._raise_for_status(resp)
 
-    async def get_json(self, url: str, **kwargs: Mapping[str, Any]) -> dict[str, Any]:
+    async def get_json(self, url: str, **kwargs: Any) -> dict[str, Any]:
         """Make a get request and return json response."""
         resp = await self.get(url, **kwargs)
         try:
@@ -108,9 +106,7 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
         _LOGGER.debug("response=%s", result)
         return result
 
-    async def post(
-        self, url: str, **kwargs: Mapping[str, Any]
-    ) -> aiohttp.ClientResponse:
+    async def post(self, url: str, **kwargs: Any) -> aiohttp.ClientResponse:
         """Make a post request."""
         try:
             resp = await self.request("post", url, **kwargs)
@@ -118,7 +114,7 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
             raise ApiException(f"Error connecting to API: {err}") from err
         return await AbstractAuth._raise_for_status(resp)
 
-    async def post_json(self, url: str, **kwargs: Mapping[str, Any]) -> dict[str, Any]:
+    async def post_json(self, url: str, **kwargs: Any) -> dict[str, Any]:
         """Make a post request and return a json response."""
         resp = await self.post(url, **kwargs)
         try:
