@@ -59,15 +59,20 @@ MIDNIGHT = datetime.time()
 ID_DELIM = "_"
 
 
+_AVAILABLE_TIMEZONES = zoneinfo.available_timezones()
+
+
 @cache
 def _create_zoneinfo(tz: str) -> zoneinfo.ZoneInfo:
     """Create a zoneinfo object for the given timezone."""
+    if tz not in _AVAILABLE_TIMEZONES:
+        raise zoneinfo.ZoneInfoNotFoundError(f"Timezone '{tz}' not available")
     return zoneinfo.ZoneInfo(tz)
 
 
 # Pre-load all timezones to avoid blocking calls in async methods later. Catch
 # any exceptions and make this best effort.
-for tz in zoneinfo.available_timezones():
+for tz in _AVAILABLE_TIMEZONES:
     try:
         _create_zoneinfo(tz)
     except zoneinfo.ZoneInfoNotFoundError:
