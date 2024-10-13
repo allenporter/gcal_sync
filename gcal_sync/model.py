@@ -292,6 +292,12 @@ class EventTypeEnum(str, Enum):
     FROM_GMAIL = "fromGmail"
     """An event from Gmail."""
 
+    BIRTHDAY = "birthday"
+    """A special all-day event with an annual recurrence."""
+
+    UNKNOWN = "unknown"
+    """An unknown event type."""
+
 
 class VisibilityEnum(str, Enum):
     """Visibility of the event."""
@@ -579,7 +585,10 @@ class Event(CalendarBaseModel):
     That is, most use cases should not need to involve checking the status.
     """
 
-    event_type: EventTypeEnum = Field(alias="eventType", default=EventTypeEnum.DEFAULT)
+    event_type: EventTypeEnum = Field(
+        alias="eventType",
+        default=EventTypeEnum.DEFAULT,
+    )
     """Specific type of the event."""
 
     visibility: VisibilityEnum = VisibilityEnum.DEFAULT
@@ -733,6 +742,15 @@ class Event(CalendarBaseModel):
                 # UNTIL is a DATE-TIME but must be a DATE
                 return date_value.date()
         return date_value
+
+    @root_validator(pre=True)
+    def _adjust_unknown_event_type(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Validate the event type."""
+        if event_type := values.get("eventType"):
+            if event_type not in [member.value for member in EventTypeEnum]:
+                _LOGGER.debug("Unknown event type: %s", event_type)
+                values["eventType"] = EventTypeEnum.UNKNOWN
+        return values
 
     @property
     def timespan(self) -> Timespan:

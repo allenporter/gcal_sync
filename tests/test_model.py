@@ -405,6 +405,8 @@ def test_required_fields() -> None:
         ("outOfOffice", EventTypeEnum.OUT_OF_OFFICE),
         ("workingLocation", EventTypeEnum.WORKING_LOCATION),
         ("fromGmail", EventTypeEnum.FROM_GMAIL),
+        ("birthday", EventTypeEnum.BIRTHDAY),
+        ("some-event-type", EventTypeEnum.UNKNOWN),
     ],
 )
 def test_event_type(api_event_type: str, event_type: EventTypeEnum) -> None:
