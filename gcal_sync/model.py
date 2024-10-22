@@ -114,7 +114,7 @@ class CalendarBaseModel(BaseModel):
     def _remove_self(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Rename any 'self' fields from all child values of the dictionary."""
         if "self" in values:
-            values["self_"] = values["self"]
+            values["is_self"] = values["self"]
             del values["self"]
 
         # Mutate any children with "self" fields
@@ -342,6 +342,9 @@ class Attendee(CalendarBaseModel):
 
     optional: bool = False
     """Whether this is an optional attendee."""
+
+    is_self: bool = False
+    """Whether this entry represents the calendar on which this copy of the event appears."""
 
     comment: Optional[str] = None
     """The attendee's response comment."""
