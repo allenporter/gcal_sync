@@ -509,21 +509,21 @@ def test_attendees() -> None:
             displayName="Example 1",
             comment="comment 1",
             responseStatus=ResponseStatus.NEEDS_ACTION,
-            isSelf=True,
+            is_self=True,
         ),
         Attendee(
             id="attendee-id-2",
             email="example2@example.com",
             displayName="Example 2",
             responseStatus=ResponseStatus.ACCEPTED,
-            isSelf=False,
+            is_self=False,
         ),
         Attendee(
             id="attendee-id-3",
             email="example3@example.com",
             displayName="Example 3",
             responseStatus=ResponseStatus.DECLINED,
-            isSelf=False,
+            is_self=False,
         ),
     ]
 
