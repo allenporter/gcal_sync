@@ -37,7 +37,7 @@ jobs:
         run: |
           pip3 install pydantic==1.10.3
           pytest --cov=gcal_sync --cov-report=xml
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           env_vars: OS,PYTHON
