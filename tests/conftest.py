@@ -26,6 +26,7 @@ ApiResult = Callable[[dict[str, Any]], None]
 ApiRequest = Callable[[], list[dict[str, Any]]]
 _T = TypeVar("_T")
 YieldFixture = Generator[_T, None, None]
+NestTestClient = TestClient[aiohttp.web.Request, aiohttp.web.Application]
 
 
 class FakeAuth(AbstractAuth):  # pylint: disable=too-few-public-methods
@@ -39,7 +40,7 @@ class FakeAuth(AbstractAuth):  # pylint: disable=too-few-public-methods
 class RefreshingAuth(AbstractAuth):
     """Implementation of AbstractAuth for sending RPCs."""
 
-    def __init__(self, test_client: TestClient) -> None:
+    def __init__(self, test_client: NestTestClient) -> None:
         super().__init__(cast(aiohttp.ClientSession, test_client), "")
 
     async def async_get_access_token(self) -> str:
@@ -104,11 +105,11 @@ def mock_app() -> aiohttp.web.Application:
 def cli_cb(
     event_loop: asyncio.AbstractEventLoop,
     app: aiohttp.web.Application,
-    aiohttp_client: Callable[[aiohttp.web.Application], Awaitable[TestClient]],
-) -> Callable[[], Awaitable[TestClient]]:
+    aiohttp_client: Callable[[aiohttp.web.Application], Awaitable[NestTestClient]],
+) -> Callable[[], Awaitable[NestTestClient]]:
     """Creates a fake aiohttp client."""
 
-    async def func() -> TestClient:
+    async def func() -> NestTestClient:
         return await aiohttp_client(app)
 
     return func
@@ -116,7 +117,7 @@ def cli_cb(
 
 @pytest.fixture(name="auth_client")
 def mock_auth_client(
-    test_client: Callable[[], Awaitable[TestClient]]
+    test_client: Callable[[], Awaitable[NestTestClient]]
 ) -> Callable[[str], Awaitable[FakeAuth]]:
     """Fixture to fake out the auth library."""
 
@@ -129,7 +130,7 @@ def mock_auth_client(
 
 @pytest.fixture(name="refreshing_auth_client")
 async def mock_refreshing_auth_client(
-    test_client: Callable[[], Awaitable[TestClient]],
+    test_client: Callable[[], Awaitable[NestTestClient]],
 ) -> Callable[[], Awaitable[AbstractAuth]]:
     """Fixture to run an auth client that sends rpcs."""
 
