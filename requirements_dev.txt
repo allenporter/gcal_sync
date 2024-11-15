@@ -10,7 +10,7 @@ pytest==8.3.3
 ruff==0.7.3
 
 
-aiohttp==3.12.2
+aiohttp==3.11.2
 click==8.1.7
 freezegun==1.5.1
 ical==8.2.0
