@@ -11,7 +11,7 @@ ruff==0.8.4
 
 
 aiohttp==3.11.11
-click==8.1.7
+click==8.1.8
 freezegun==1.5.1
 ical==8.2.0
 pydantic==2.10.4
