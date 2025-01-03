@@ -18,6 +18,7 @@ for details.
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import enum
 import json
@@ -542,8 +543,14 @@ class CalendarEventStoreService:
             tzinfo = datetime.timezone.utc
         events_data = await self._lookup_events_data()
         _LOGGER.debug("Created timeline of %d events", len(events_data))
-        event_objects = [Event(**data) for data in events_data.values()]
-        return calendar_timeline(event_objects, tzinfo)
+
+        def _build_timeline() -> Timeline:
+            """Build the timeline of events, which can take some time to parse."""
+            event_objects = [Event(**data) for data in events_data.values()]
+            return calendar_timeline(event_objects, tzinfo)
+
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _build_timeline)
 
     async def async_add_event(self, event: Event) -> None:
         """Add the specified event to the calendar.
