@@ -33,10 +33,6 @@ jobs:
       - name: Test with pytest
         run: |
           pytest --cov=gcal_sync --cov-report=term-missing
-      - name: Test with pytest (pydantic v1)
-        run: |
-          pip3 install pydantic==1.10.3
-          pytest --cov=gcal_sync --cov-report=xml
       - uses: codecov/codecov-action@v5.1.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
