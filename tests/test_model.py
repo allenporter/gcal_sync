@@ -643,6 +643,19 @@ def test_invalid_rrule_until_format() -> None:
         )
 
 
+def test_invalid_rrule_content_lines() -> None:
+    """Test invalid RRULE parsing."""
+    with pytest.raises(CalendarParseException, match=r"Expected ':' in contentline"):
+        Event.parse_obj(
+            {
+                "summary": "Summary",
+                "start": {"date_time": "2012-11-27T18:00:00"},
+                "end": {"date_time": "2012-11-27T19:00:00"},
+                "recurrence": ["RRULE;"],
+            }
+        )
+
+
 def test_invalid_rrule_until_time() -> None:
     """Test invalid RRULE parsing."""
     with pytest.raises(

@@ -16,9 +16,9 @@ from enum import Enum
 from typing import Any, Optional, Union
 
 from ical.component import ComponentModel
+from ical.recurrence import Recurrences
 from ical.exceptions import CalendarParseError
 from ical.iter import RulesetIterable
-from ical.parsing.component import parse_content
 from ical.timespan import Timespan
 from ical.types.data_types import DATA_TYPE
 from ical.types.recur import Frequency, Recur
@@ -472,18 +472,16 @@ class Recurrence(ComponentModel):
     @classmethod
     def from_recurrence(cls, recurrence: list[str]) -> "Recurrence":
         """Parse a Recurrence object form calendar API list of recurrence rules."""
-        content = (
-            [
-                "BEGIN:RECURRENCE",
-            ]
-            + recurrence
-            + [
-                "END:RECURRENCE",
-            ]
-        )
-        component = parse_content("\n".join(content))
         try:
-            return cls.parse_obj(component[0].as_dict())
+            recurrences = Recurrences.from_basic_contentlines(recurrence)
+        except ValidationError as err:
+            raise CalendarParseException(err) from err
+        try:
+            return cls(
+                rrule=recurrences.rrule,
+                rdate=recurrences.rdate,
+                exdate=recurrences.exdate,
+            )
         except ValidationError as err:
             raise CalendarParseException(err) from err
 
