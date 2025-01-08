@@ -16,5 +16,5 @@ freezegun==1.5.1
 ical==8.3.0
 pydantic==2.10.4
 pytest-aiohttp==1.0.5
-pytest-asyncio==0.25.1
+pytest-asyncio==0.25.2
 pytz==2024.2
