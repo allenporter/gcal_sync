@@ -13,7 +13,7 @@ ruff==0.11.2
 aiohttp==3.11.16
 click==8.1.8
 freezegun==1.5.1
-ical==8.3.1
+ical==9.1.0
 pydantic==2.11.2
 pytest-aiohttp==1.1.0
 pytest-asyncio==0.26.0
