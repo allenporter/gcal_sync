@@ -645,7 +645,10 @@ def test_invalid_rrule_until_format() -> None:
 
 def test_invalid_rrule_content_lines() -> None:
     """Test invalid RRULE parsing."""
-    with pytest.raises(CalendarParseException, match=r"Expected ':' in contentline"):
+    with pytest.raises(
+        CalendarParseException,
+        match=r"Failed to parse calendar EVENT component: Failed to parse recurrence",
+    ):
         Event.parse_obj(
             {
                 "summary": "Summary",

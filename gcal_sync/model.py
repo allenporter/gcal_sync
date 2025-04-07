@@ -100,6 +100,18 @@ class AccessRole(str, Enum):
         return self in (AccessRole.WRITER, AccessRole.OWNER)
 
 
+def _raise_parse_exception(
+    component: str, err: ValidationError
+) -> CalendarParseException:
+    """Raise a CalendarParseException for the given component and error."""
+    message = [f"Failed to parse calendar {component} component"]
+    for error in err.errors():
+        if msg := error.get("msg"):
+            message.append(msg)
+    error_str = ": ".join(message)
+    return CalendarParseException(error_str, detailed_error=str(err))
+
+
 class CalendarBaseModel(BaseModel):
     """Base class for calendar models."""
 
@@ -108,7 +120,7 @@ class CalendarBaseModel(BaseModel):
         try:
             super().__init__(**data)
         except ValidationError as err:
-            raise CalendarParseException(f"Failed to parse component: {err}") from err
+            raise _raise_parse_exception(self.__class__.__name__.upper(), err) from err
 
     @root_validator(pre=True)
     def _remove_self(cls, values: dict[str, Any]) -> dict[str, Any]:
@@ -475,7 +487,7 @@ class Recurrence(ComponentModel):
         try:
             recurrences = Recurrences.from_basic_contentlines(recurrence)
         except ValidationError as err:
-            raise CalendarParseException(err) from err
+            raise _raise_parse_exception(cls.__name__.upper(), err) from err
         try:
             return cls(
                 rrule=recurrences.rrule,
@@ -483,7 +495,7 @@ class Recurrence(ComponentModel):
                 exdate=recurrences.exdate,
             )
         except ValidationError as err:
-            raise CalendarParseException(err) from err
+            raise _raise_parse_exception(cls.__name__.upper(), err) from err
 
     def as_rrule(
         self, dtstart: datetime.date | datetime.datetime
