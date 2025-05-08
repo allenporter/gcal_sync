@@ -353,7 +353,11 @@ class GoogleCalendarService:
                 calendar_id=pathname2url(calendar_id), event_id=pathname2url(event_id)
             )
         )
-        return Event(**result)
+        event = Event(**result)
+        if calendar_id.endswith("@resource.calendar.google.com"):
+            # Fix all day events in resource calendars.
+            event.adjust_all_day_event()
+        return event
 
     async def async_list_events(
         self,
@@ -385,7 +389,11 @@ class GoogleCalendarService:
             params=params,
         )
         _ListEventsResponseModel.update_forward_refs()
-        return _ListEventsResponseModel(**result)
+        response = _ListEventsResponseModel(**result)
+        if request.calendar_id.endswith("@resource.calendar.google.com"):
+            for event in response.items:
+                event.adjust_all_day_event()
+        return response
 
     async def async_create_event(
         self,

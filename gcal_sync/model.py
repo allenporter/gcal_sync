@@ -765,6 +765,21 @@ class Event(CalendarBaseModel):
                 values["eventType"] = EventTypeEnum.UNKNOWN
         return values
 
+    def adjust_all_day_event(self) -> None:
+        """Adjust to an all day event."""
+        if (
+            self.start.date_time
+            and self.end.date_time
+            and self.start.date_time.time() == MIDNIGHT
+            and self.end.date_time.time() == MIDNIGHT
+        ):
+            self.start.date = self.start.date_time.date()
+            self.start.date_time = None
+            self.start.timezone = None
+            self.end.date = self.end.date_time.date()
+            self.end.date_time = None
+            self.end.timezone = None
+
     @property
     def timespan(self) -> Timespan:
         """Return a timespan representing the event start and end."""
