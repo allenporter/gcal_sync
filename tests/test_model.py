@@ -28,6 +28,7 @@ from gcal_sync.exceptions import CalendarParseException
 
 SUMMARY = "test summary"
 LOS_ANGELES = zoneinfo.ZoneInfo("America/Los_Angeles")
+EXCLUDED_FIELDS = {"recur", "private_calendar_id"}
 
 
 def test_calendar() -> None:
@@ -280,8 +281,8 @@ def test_event_utc() -> None:
     )
 
 
-def test_all_day_event() -> None:
-    """Test adjusting all day events."""
+def test_all_day_event_fix_for_resource() -> None:
+    """Test adjusting incorrect resource all day events."""
 
     event = Event.parse_obj(
         {
@@ -296,9 +297,9 @@ def test_all_day_event() -> None:
                 "dateTime": "2025-04-13T00:00:00",
                 "timeZone": "Europe/Oslo",
             },
+            "private_calendar_id": "12345@resource.calendar.google.com",
         }
     )
-    event.adjust_all_day_event()
     assert event.start
     assert event.start.date_time is None
     assert event.start.timezone is None
@@ -324,9 +325,9 @@ def test_all_day_event() -> None:
                 "dateTime": "2025-04-13T09:30:00",
                 "timeZone": "Europe/Oslo",
             },
+            "private_calendar_id": "12345@resource.calendar.google.com",
         }
     )
-    event.adjust_all_day_event()
     assert event.start
     assert event.start.date is None
     assert event.start.date_time
@@ -353,7 +354,6 @@ def test_all_day_event() -> None:
             },
         }
     )
-    event.adjust_all_day_event()
     assert event.start
     assert event.start.date is None
     assert event.start.date_time
@@ -380,7 +380,6 @@ def test_all_day_event() -> None:
             },
         }
     )
-    event.adjust_all_day_event()
     assert event.start
     assert event.start.date is None
     assert event.start.date_time
@@ -791,7 +790,11 @@ def test_event_fields_mask() -> None:
     """Test that all fields in the pydantic model are specified in the field mask."""
 
     assert EVENT_FIELDS == ",".join(
-        [field.alias for field in Event.__fields__.values() if field.alias != "recur"]
+        [
+            field.alias
+            for field in Event.__fields__.values()
+            if field.alias not in EXCLUDED_FIELDS
+        ]
     )
 
 

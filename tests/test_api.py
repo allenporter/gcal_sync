@@ -142,12 +142,13 @@ async def test_get_event(
         transparency="transparent",
     )
 
+
 async def test_get_event_as_resource_calendar_all_day_event(
     calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
     json_response: ApiResult,
     url_request: Callable[[], str],
 ) -> None:
-    """Test getting a single calendar event."""
+    """Test getting a calendar event for a resource."""
 
     json_response(
         {
@@ -155,13 +156,11 @@ async def test_get_event_as_resource_calendar_all_day_event(
             "summary": "Event 1",
             "description": "Event description 1",
             "start": {
+                # All day event incorrectly set as dateTime
                 "dateTime": "2022-04-13T00:00:00+02:00",
-                "timeZone": "Europe/Oslo"
+                "timeZone": "Europe/Oslo",
             },
-            "end": {
-                "dateTime": "2022-04-14T00:00:00+02:00",
-                "timeZone": "Europe/Oslo"
-            },
+            "end": {"dateTime": "2022-04-14T00:00:00+02:00", "timeZone": "Europe/Oslo"},
             "status": "confirmed",
             "transparency": "transparent",
         }
@@ -170,7 +169,9 @@ async def test_get_event_as_resource_calendar_all_day_event(
     event = await calendar_service.async_get_event(
         "some-calendar-id@resource.calendar.google.com", "some-event-id-1"
     )
-    assert url_request() == ["/calendars/some-calendar-id@resource.calendar.google.com/events/some-event-id-1"]
+    assert url_request() == [
+        "/calendars/some-calendar-id@resource.calendar.google.com/events/some-event-id-1"
+    ]
     assert event == Event(
         id="some-event-id-1",
         summary="Event 1",
@@ -283,9 +284,9 @@ async def test_list_events_with_date_limit(
 
 @freeze_time("2022-04-30 07:31:02", tz_offset=-6)
 async def test_list_events_with_all_day_event_in_resource_calendar(
-        calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
-        json_response: ApiResult,
-        url_request: Callable[[], str],
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
 ) -> None:
     """Test list calendars API."""
 
