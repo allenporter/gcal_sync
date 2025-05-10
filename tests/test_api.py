@@ -143,6 +143,45 @@ async def test_get_event(
     )
 
 
+async def test_get_event_as_resource_calendar_all_day_event(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test getting a calendar event for a resource."""
+
+    json_response(
+        {
+            "id": "some-event-id-1",
+            "summary": "Event 1",
+            "description": "Event description 1",
+            "start": {
+                # All day event incorrectly set as dateTime
+                "dateTime": "2022-04-13T00:00:00+02:00",
+                "timeZone": "Europe/Oslo",
+            },
+            "end": {"dateTime": "2022-04-14T00:00:00+02:00", "timeZone": "Europe/Oslo"},
+            "status": "confirmed",
+            "transparency": "transparent",
+        }
+    )
+    calendar_service = await calendar_service_cb()
+    event = await calendar_service.async_get_event(
+        "some-calendar-id@resource.calendar.google.com", "some-event-id-1"
+    )
+    assert url_request() == [
+        "/calendars/some-calendar-id@resource.calendar.google.com/events/some-event-id-1"
+    ]
+    assert event == Event(
+        id="some-event-id-1",
+        summary="Event 1",
+        description="Event description 1",
+        start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
+        end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
+        transparency="transparent",
+    )
+
+
 @freeze_time("2022-04-30 07:31:02", tz_offset=-6)
 async def test_list_events(
     calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
@@ -241,6 +280,84 @@ async def test_list_events_with_date_limit(
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
         "&timeMin=2022-04-13T07:30:12-06:00&timeMax=2022-04-13T09:30:12-06:00"
     ]
+
+
+@freeze_time("2022-04-30 07:31:02", tz_offset=-6)
+async def test_list_events_with_all_day_event_in_resource_calendar(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test list calendars API."""
+
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "summary": "Event 1",
+                    "description": "Event description 1",
+                    "start": {
+                        "dateTime": "2022-04-13T00:00:00+02:00",
+                        "timeZone": "Europe/Oslo",
+                    },
+                    "end": {
+                        "dateTime": "2022-04-14T00:00:00+02:00",
+                        "timeZone": "Europe/Oslo",
+                    },
+                    "status": "confirmed",
+                    "transparency": "transparent",
+                },
+                {
+                    "id": "some-event-id-2",
+                    "summary": "Event 2",
+                    "description": "Event description 2",
+                    "start": {
+                        "dateTime": "2022-04-14T00:00:00+02:00",
+                        "timeZone": "Europe/Oslo",
+                    },
+                    "end": {
+                        "dateTime": "2022-04-20T00:00:00+02:00",
+                        "timeZone": "Europe/Oslo",
+                    },
+                    "transparency": "opaque",
+                },
+            ]
+        }
+    )
+    calendar_service = await calendar_service_cb()
+    result = await calendar_service.async_list_events(
+        ListEventsRequest(calendar_id="some-calendar-id@resource.calendar.google.com")
+    )
+    assert url_request() == [
+        f"/calendars/some-calendar-id@resource.calendar.google.com/events?{EVENT_LIST_PARAMS}"
+        "&timeMin=2022-04-30T01:31:02%2B00:00"
+    ]
+    assert result.items == [
+        Event(
+            id="some-event-id-1",
+            summary="Event 1",
+            description="Event description 1",
+            start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
+            transparency="transparent",
+        ),
+        Event(
+            id="some-event-id-2",
+            summary="Event 2",
+            description="Event description 2",
+            start=DateOrDatetime(date=datetime.date(2022, 4, 14)),
+            end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
+            transparency="opaque",
+        ),
+    ]
+    assert result.page_token is None
+    assert result.sync_token is None
+
+    items = []
+    async for result_page in result:
+        items.extend(result_page.items)
+    assert len(items) == 2
 
 
 async def test_create_event_with_date(

@@ -57,6 +57,7 @@ EVENT_FIELDS = (
 )
 MIDNIGHT = datetime.time()
 ID_DELIM = "_"
+RESOURCE_ID_SUFFIX = "@resource.calendar.google.com"
 
 
 _AVAILABLE_TIMEZONES = zoneinfo.available_timezones()
@@ -630,6 +631,12 @@ class Event(CalendarBaseModel):
 
     reminders: Optional[Reminders] = None
 
+    private_calendar_id: Optional[str] = Field(default=None, exclude=True)
+    """The calendar id of the calendar this event belongs to.
+
+    This attribute is used internally and not part of the event API.
+    """
+
     @property
     def computed_duration(self) -> datetime.timedelta:
         """Return the event duration."""
@@ -763,6 +770,24 @@ class Event(CalendarBaseModel):
             if event_type not in [member.value for member in EventTypeEnum]:
                 _LOGGER.debug("Unknown event type: %s", event_type)
                 values["eventType"] = EventTypeEnum.UNKNOWN
+        return values
+
+    @root_validator
+    def _adjust_resource_all_day_event(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Fix a bug in google calendar resources where all day events are incorrect."""
+        if (
+            (calendar_id := values.get("private_calendar_id"))
+            and calendar_id.endswith(RESOURCE_ID_SUFFIX)
+            and (dtstart := values.get("start"))
+            and (dtend := values.get("end"))
+            and dtstart.date_time
+            and dtstart.date_time
+            and dtend.date_time.time() == MIDNIGHT
+            and dtend.date_time.time() == MIDNIGHT
+        ):
+            _LOGGER.debug("Fixing all day event for resource calendar: %s", calendar_id)
+            values["start"] = DateOrDatetime(date=dtstart.date_time.date())
+            values["end"] = DateOrDatetime(date=dtend.date_time.date())
         return values
 
     @property
