@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 import zoneinfo
+from typing import Any
 
 import pytest
 
@@ -28,6 +29,8 @@ from gcal_sync.exceptions import CalendarParseException
 
 SUMMARY = "test summary"
 LOS_ANGELES = zoneinfo.ZoneInfo("America/Los_Angeles")
+OSLO_TEXT = "Europe/Oslo"
+OSLO = zoneinfo.ZoneInfo(OSLO_TEXT)
 EXCLUDED_FIELDS = {"recur", "private_calendar_id"}
 
 
@@ -281,7 +284,95 @@ def test_event_utc() -> None:
     )
 
 
-def test_all_day_event_fix_for_resource() -> None:
+@pytest.mark.parametrize(
+    ("event_data", "expected_start", "expected_end"),
+    [
+        (
+            {
+                "start": {
+                    "dateTime": "2025-04-12T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "end": {
+                    "dateTime": "2025-04-13T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "private_calendar_id": "12345@resource.calendar.google.com",
+            },
+            datetime.date(2025, 4, 12),
+            datetime.date(2025, 4, 13),
+        ),
+        (
+            {
+                "start": {
+                    "dateTime": "2025-04-12T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "end": {
+                    "dateTime": "2025-04-13T09:30:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "private_calendar_id": "12345@resource.calendar.google.com",
+            },
+            datetime.datetime(2025, 4, 12, 0, 0, 0, tzinfo=OSLO),
+            datetime.datetime(2025, 4, 13, 9, 30, 0, tzinfo=OSLO),
+        ),
+        (
+            {
+                "start": {
+                    "dateTime": "2025-04-12T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "end": {
+                    "dateTime": "2025-04-13T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+            },
+            datetime.datetime(2025, 4, 12, 0, 0, 0, tzinfo=OSLO),
+            datetime.datetime(2025, 4, 13, 0, 0, 0, tzinfo=OSLO),
+        ),
+        (
+            {
+                "start": {
+                    "dateTime": "2025-04-12T18:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "end": {
+                    "dateTime": "2025-04-13T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+            },
+            datetime.datetime(2025, 4, 12, 18, 0, 0, tzinfo=OSLO),
+            datetime.datetime(2025, 4, 13, 0, 0, 0, tzinfo=OSLO),
+        ),
+        (
+            {
+                "start": {
+                    "dateTime": "2025-04-12T09:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "end": {
+                    "dateTime": "2025-04-12T18:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+            },
+            datetime.datetime(2025, 4, 12, 9, 0, 0, tzinfo=OSLO),
+            datetime.datetime(2025, 4, 12, 18, 0, 0, tzinfo=OSLO),
+        ),
+    ],
+    ids=[
+        "resource-all-day-event",
+        "resource-event-not-all-day",
+        "non-resource-midnight-to-midnight",
+        "non-resource-ends-midnight",
+        "non-resource-event",
+    ],
+)
+def test_all_day_event_fix_for_resource(
+    event_data: dict[str, Any],
+    expected_start: datetime.datetime | datetime.date,
+    expected_end: datetime.datetime | datetime.date,
+) -> None:
     """Test adjusting incorrect resource all day events."""
 
     event = Event.parse_obj(
@@ -289,107 +380,14 @@ def test_all_day_event_fix_for_resource() -> None:
             "kind": "calendar#event",
             "id": "some-event-id",
             "summary": "Event summary",
-            "start": {
-                "dateTime": "2025-04-12T00:00:00",
-                "timeZone": "Europe/Oslo",
-            },
-            "end": {
-                "dateTime": "2025-04-13T00:00:00",
-                "timeZone": "Europe/Oslo",
-            },
-            "private_calendar_id": "12345@resource.calendar.google.com",
+            **event_data,
         }
     )
     assert event.start
-    assert event.start.date_time is None
-    assert event.start.timezone is None
-    assert event.start.date == datetime.date(2025, 4, 12)
-    assert event.start.value == datetime.date(2025, 4, 12)
+    assert event.start.value == expected_start
 
     assert event.end
-    assert event.end.date_time is None
-    assert event.end.timezone is None
-    assert event.end.date == datetime.date(2025, 4, 13)
-    assert event.end.value == datetime.date(2025, 4, 13)
-
-    event = Event.parse_obj(
-        {
-            "kind": "calendar#event",
-            "id": "some-event-id",
-            "summary": "Event summary",
-            "start": {
-                "dateTime": "2025-04-12T00:00:00",
-                "timeZone": "Europe/Oslo",
-            },
-            "end": {
-                "dateTime": "2025-04-13T09:30:00",
-                "timeZone": "Europe/Oslo",
-            },
-            "private_calendar_id": "12345@resource.calendar.google.com",
-        }
-    )
-    assert event.start
-    assert event.start.date is None
-    assert event.start.date_time
-    assert event.start.date_time == datetime.datetime(2025, 4, 12, 0, 0, 0)
-    assert event.start.timezone == "Europe/Oslo"
-
-    assert event.end
-    assert event.end.date is None
-    assert event.end.date_time == datetime.datetime(2025, 4, 13, 9, 30, 0)
-    assert event.end.timezone == "Europe/Oslo"
-
-    event = Event.parse_obj(
-        {
-            "kind": "calendar#event",
-            "id": "some-event-id",
-            "summary": "Event summary",
-            "start": {
-                "dateTime": "2025-04-12T18:00:00",
-                "timeZone": "Europe/Oslo",
-            },
-            "end": {
-                "dateTime": "2025-04-13T00:00:00",
-                "timeZone": "Europe/Oslo",
-            },
-        }
-    )
-    assert event.start
-    assert event.start.date is None
-    assert event.start.date_time
-    assert event.start.date_time == datetime.datetime(2025, 4, 12, 18, 0, 0)
-    assert event.start.timezone == "Europe/Oslo"
-
-    assert event.end
-    assert event.end.date is None
-    assert event.end.date_time == datetime.datetime(2025, 4, 13, 0, 0, 0)
-    assert event.end.timezone == "Europe/Oslo"
-
-    event = Event.parse_obj(
-        {
-            "kind": "calendar#event",
-            "id": "some-event-id",
-            "summary": "Event summary",
-            "start": {
-                "dateTime": "2025-04-12T09:00:00",
-                "timeZone": "Europe/Oslo",
-            },
-            "end": {
-                "dateTime": "2025-04-12T18:00:00",
-                "timeZone": "Europe/Oslo",
-            },
-        }
-    )
-    assert event.start
-    assert event.start.date is None
-    assert event.start.date_time
-    assert event.start.date_time == datetime.datetime(2025, 4, 12, 9, 0, 0)
-    assert event.start.timezone == "Europe/Oslo"
-
-    assert event.end
-    assert event.end.date is None
-    assert event.end.date_time == datetime.datetime(2025, 4, 12, 18, 0, 0)
-    assert event.end.timezone == "Europe/Oslo"
+    assert event.end.value == expected_end
 
 
 def test_event_timezone_comparison() -> None:
