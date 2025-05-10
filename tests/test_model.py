@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 import zoneinfo
+from typing import Any
 
 import pytest
 
@@ -28,6 +29,9 @@ from gcal_sync.exceptions import CalendarParseException
 
 SUMMARY = "test summary"
 LOS_ANGELES = zoneinfo.ZoneInfo("America/Los_Angeles")
+OSLO_TEXT = "Europe/Oslo"
+OSLO = zoneinfo.ZoneInfo(OSLO_TEXT)
+EXCLUDED_FIELDS = {"recur", "private_calendar_id"}
 
 
 def test_calendar() -> None:
@@ -278,6 +282,112 @@ def test_event_utc() -> None:
     assert event.end.value == datetime.datetime(
         2022, 4, 12, 17, 0, 0, tzinfo=datetime.timezone.utc
     )
+
+
+@pytest.mark.parametrize(
+    ("event_data", "expected_start", "expected_end"),
+    [
+        (
+            {
+                "start": {
+                    "dateTime": "2025-04-12T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "end": {
+                    "dateTime": "2025-04-13T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "private_calendar_id": "12345@resource.calendar.google.com",
+            },
+            datetime.date(2025, 4, 12),
+            datetime.date(2025, 4, 13),
+        ),
+        (
+            {
+                "start": {
+                    "dateTime": "2025-04-12T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "end": {
+                    "dateTime": "2025-04-13T09:30:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "private_calendar_id": "12345@resource.calendar.google.com",
+            },
+            datetime.datetime(2025, 4, 12, 0, 0, 0, tzinfo=OSLO),
+            datetime.datetime(2025, 4, 13, 9, 30, 0, tzinfo=OSLO),
+        ),
+        (
+            {
+                "start": {
+                    "dateTime": "2025-04-12T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "end": {
+                    "dateTime": "2025-04-13T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+            },
+            datetime.datetime(2025, 4, 12, 0, 0, 0, tzinfo=OSLO),
+            datetime.datetime(2025, 4, 13, 0, 0, 0, tzinfo=OSLO),
+        ),
+        (
+            {
+                "start": {
+                    "dateTime": "2025-04-12T18:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "end": {
+                    "dateTime": "2025-04-13T00:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+            },
+            datetime.datetime(2025, 4, 12, 18, 0, 0, tzinfo=OSLO),
+            datetime.datetime(2025, 4, 13, 0, 0, 0, tzinfo=OSLO),
+        ),
+        (
+            {
+                "start": {
+                    "dateTime": "2025-04-12T09:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+                "end": {
+                    "dateTime": "2025-04-12T18:00:00",
+                    "timeZone": OSLO_TEXT,
+                },
+            },
+            datetime.datetime(2025, 4, 12, 9, 0, 0, tzinfo=OSLO),
+            datetime.datetime(2025, 4, 12, 18, 0, 0, tzinfo=OSLO),
+        ),
+    ],
+    ids=[
+        "resource-all-day-event",
+        "resource-event-not-all-day",
+        "non-resource-midnight-to-midnight",
+        "non-resource-ends-midnight",
+        "non-resource-event",
+    ],
+)
+def test_all_day_event_fix_for_resource(
+    event_data: dict[str, Any],
+    expected_start: datetime.datetime | datetime.date,
+    expected_end: datetime.datetime | datetime.date,
+) -> None:
+    """Test adjusting incorrect resource all day events."""
+
+    event = Event.parse_obj(
+        {
+            "kind": "calendar#event",
+            "id": "some-event-id",
+            "summary": "Event summary",
+            **event_data,
+        }
+    )
+    assert event.start
+    assert event.start.value == expected_start
+
+    assert event.end
+    assert event.end.value == expected_end
 
 
 def test_event_timezone_comparison() -> None:
@@ -678,7 +788,11 @@ def test_event_fields_mask() -> None:
     """Test that all fields in the pydantic model are specified in the field mask."""
 
     assert EVENT_FIELDS == ",".join(
-        [field.alias for field in Event.__fields__.values() if field.alias != "recur"]
+        [
+            field.alias
+            for field in Event.__fields__.values()
+            if field.alias not in EXCLUDED_FIELDS
+        ]
     )
 
 

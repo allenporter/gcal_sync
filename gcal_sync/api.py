@@ -274,6 +274,19 @@ class _ListEventsResponseModel(SyncableResponse):
 
     items: List[Event] = []
 
+    @root_validator(pre=True)
+    def _propagate_calendar_id(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Propagate the calendar id attribute down to the events in the response.
+
+        This is used so that we can access the "calendar_id" attribute on the event
+        to make other parsing decisions.
+        """
+        if not (calendar_id := values.get("private_calendar_id")):
+            return values
+        for item in values.get("items", []):
+            item["private_calendar_id"] = calendar_id
+        return values
+
 
 class ListEventsResponse:
     """Api response containing a list of events."""
@@ -353,7 +366,8 @@ class GoogleCalendarService:
                 calendar_id=pathname2url(calendar_id), event_id=pathname2url(event_id)
             )
         )
-        return Event(**result)
+        event = Event(**result, private_calendar_id=calendar_id)
+        return event
 
     async def async_list_events(
         self,
@@ -385,7 +399,10 @@ class GoogleCalendarService:
             params=params,
         )
         _ListEventsResponseModel.update_forward_refs()
-        return _ListEventsResponseModel(**result)
+        response = _ListEventsResponseModel(
+            **result, private_calendar_id=request.calendar_id
+        )
+        return response
 
     async def async_create_event(
         self,
