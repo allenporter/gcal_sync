@@ -169,6 +169,12 @@ class Calendar(CalendarBaseModel):
     primary: bool = False
     """Whether the calendar is the primary calendar of the authenticated user."""
 
+    background_color: Optional[str] = Field(alias="backgroundColor", default=None)
+    """The main color of the calendar in the hexadecimal format "#0088aa"."""
+
+    foreground_color: Optional[str] = Field(alias="foregroundColor", default=None)
+    """The foreground color of the calendar in the hexadecimal format "#ffffff"."""
+
     class Config:
         """Pydnatic model configuration."""
 

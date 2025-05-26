@@ -46,6 +46,10 @@ def test_calendar() -> None:
             "location": "Some location",
             "hidden": False,
             "accessRole": "owner",
+            "colorId": "17",
+            "backgroundColor": "#9a9cff",
+            "foregroundColor": "#000000",
+            "selected": True,
         }
     )
     assert calendar.id == "some-calendar-id"
@@ -54,6 +58,8 @@ def test_calendar() -> None:
     assert calendar.location == "Some location"
     assert calendar.timezone is None
     assert calendar.access_role == AccessRole.OWNER
+    assert calendar.background_color == "#9a9cff"
+    assert calendar.foreground_color == "#000000"
 
 
 def test_calendar_timezone() -> None:
@@ -74,6 +80,8 @@ def test_calendar_timezone() -> None:
     assert calendar.location is None
     assert calendar.timezone == "America/Los_Angeles"
     assert calendar.access_role == AccessRole.READER
+    assert calendar.background_color is None
+    assert calendar.foreground_color is None
 
 
 def test_event_with_date() -> None:
