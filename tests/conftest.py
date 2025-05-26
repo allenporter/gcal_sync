@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import datetime
 import json
 from collections.abc import Awaitable, Callable
@@ -103,7 +102,6 @@ def mock_app() -> aiohttp.web.Application:
 
 @pytest.fixture(name="test_client")
 def cli_cb(
-    event_loop: asyncio.AbstractEventLoop,
     app: aiohttp.web.Application,
     aiohttp_client: Callable[[aiohttp.web.Application], Awaitable[NestTestClient]],
 ) -> Callable[[], Awaitable[NestTestClient]]:
@@ -117,7 +115,7 @@ def cli_cb(
 
 @pytest.fixture(name="auth_client")
 def mock_auth_client(
-    test_client: Callable[[], Awaitable[NestTestClient]]
+    test_client: Callable[[], Awaitable[NestTestClient]],
 ) -> Callable[[str], Awaitable[FakeAuth]]:
     """Fixture to fake out the auth library."""
 
@@ -142,7 +140,7 @@ async def mock_refreshing_auth_client(
 
 @pytest.fixture(name="calendar_service_cb")
 def mock_calendar_service(
-    auth_client: Callable[[str], Awaitable[FakeAuth]]
+    auth_client: Callable[[str], Awaitable[FakeAuth]],
 ) -> Callable[[], Awaitable[GoogleCalendarService]]:
     """Fixture to fake out the api service."""
 
@@ -273,7 +271,7 @@ def fake_event_sync_manager(
 
 @pytest.fixture(name="fetch_events")
 async def mock_fetch_events(
-    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]]
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
 ) -> Callable[..., Awaitable[list[dict[str, Any]]]]:
     """Fixture to return events on the calendar."""
     sync = await event_sync_manager_cb()
