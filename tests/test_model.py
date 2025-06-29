@@ -604,6 +604,8 @@ def test_attendees() -> None:
                     "displayName": "Example 1",
                     "comment": "comment 1",
                     "self": True,
+                    "organizer": True,
+                    "resource": True,
                 },
                 {
                     "id": "attendee-id-2",
@@ -628,6 +630,8 @@ def test_attendees() -> None:
             comment="comment 1",
             responseStatus=ResponseStatus.NEEDS_ACTION,
             is_self=True,
+            organizer=True,
+            resource=True,
         ),
         Attendee(
             id="attendee-id-2",
@@ -635,6 +639,8 @@ def test_attendees() -> None:
             displayName="Example 2",
             responseStatus=ResponseStatus.ACCEPTED,
             is_self=False,
+            organizer=False,
+            resource=False,
         ),
         Attendee(
             id="attendee-id-3",
@@ -642,6 +648,8 @@ def test_attendees() -> None:
             displayName="Example 3",
             responseStatus=ResponseStatus.DECLINED,
             is_self=False,
+            organizer=False,
+            resource=False,
         ),
     ]
 
