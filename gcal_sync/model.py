@@ -368,6 +368,12 @@ class Attendee(CalendarBaseModel):
     comment: Optional[str] = None
     """The attendee's response comment."""
 
+    organizer: bool = False
+    """Whether the attendee is the organizer of the event."""
+
+    resource: bool = False
+    """Whether the attendee is a resource."""
+
     response_status: ResponseStatus = Field(
         alias="responseStatus", default=ResponseStatus.NEEDS_ACTION
     )
