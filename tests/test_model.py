@@ -626,9 +626,9 @@ def test_attendees() -> None:
         Attendee(
             id="attendee-id-1",
             email="example1@example.com",
-            displayName="Example 1",
+            display_name="Example 1",
             comment="comment 1",
-            responseStatus=ResponseStatus.NEEDS_ACTION,
+            response_status=ResponseStatus.NEEDS_ACTION,
             is_self=True,
             organizer=True,
             resource=True,
@@ -636,8 +636,8 @@ def test_attendees() -> None:
         Attendee(
             id="attendee-id-2",
             email="example2@example.com",
-            displayName="Example 2",
-            responseStatus=ResponseStatus.ACCEPTED,
+            display_name="Example 2",
+            response_status=ResponseStatus.ACCEPTED,
             is_self=False,
             organizer=False,
             resource=False,
@@ -645,8 +645,8 @@ def test_attendees() -> None:
         Attendee(
             id="attendee-id-3",
             email="example3@example.com",
-            displayName="Example 3",
-            responseStatus=ResponseStatus.DECLINED,
+            display_name="Example 3",
+            response_status=ResponseStatus.DECLINED,
             is_self=False,
             organizer=False,
             resource=False,

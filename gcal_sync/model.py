@@ -379,6 +379,9 @@ class Attendee(CalendarBaseModel):
     )
     """The attendee's response status."""
 
+    class Config:
+        allow_population_by_field_name = True
+
 
 class SyntheticEventId:
     """Used to generate a event ids for synthetic recurring events.
@@ -565,6 +568,9 @@ class Reminders(CalendarBaseModel):
     specific to the event, or, if not set, indicates that no reminders are
     set for this event. The maximum number of override reminders is 5.
     """
+
+    class Config:
+        allow_population_by_field_name = True
 
 
 class Event(CalendarBaseModel):
