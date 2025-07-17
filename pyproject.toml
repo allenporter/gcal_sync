@@ -1,7 +1,32 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=77.0"]
+
+[project]
+name = "gcal_sync"
+version = "7.2.0"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+description = "A python library for syncing Google Calendar to local storage"
+readme = "README.md"
+authors = [{ name = "Allen Porter", email = "allen.porter@gmail.com" }]
+requires-python = ">=3.10"
+classifiers = []
+dependencies = [
+  "aiohttp>=3.8.1",
+  "ical>=8.3.0",
+  "pydantic>=2.10.4",
+]
+
+[project.urls]
+Source = "https://github.com/allenporter/gcal_sync"
+
+[tool.setuptools.packages.find]
+include = ["gcal_sync*"]
+
 [tool.mypy]
 plugins = "pydantic.v1.mypy"
 exclude = [
-  "setup.py",
   "venv/",
 ]
 platform = "linux"
