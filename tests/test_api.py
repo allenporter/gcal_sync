@@ -140,6 +140,7 @@ async def test_get_event(
         start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
         end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
         transparency="transparent",
+        private_calendar_id="some-calendar-id",
     )
 
 
@@ -179,6 +180,7 @@ async def test_get_event_as_resource_calendar_all_day_event(
         start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
         end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
         transparency="transparent",
+        private_calendar_id="some-calendar-id@resource.calendar.google.com",
     )
 
 
@@ -227,7 +229,7 @@ async def test_list_events(
     )
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-04-30T01:31:02%2B00:00"
+        "&timeMin=2022-04-30T01:31:02Z"
     ]
     assert result.items == [
         Event(
@@ -237,6 +239,7 @@ async def test_list_events(
             start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
             end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
             transparency="transparent",
+            private_calendar_id="some-calendar-id",
         ),
         Event(
             id="some-event-id-2",
@@ -245,6 +248,7 @@ async def test_list_events(
             start=DateOrDatetime(date=datetime.date(2022, 4, 14)),
             end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
             transparency="opaque",
+            private_calendar_id="some-calendar-id",
         ),
     ]
     assert result.page_token is None
@@ -331,7 +335,7 @@ async def test_list_events_with_all_day_event_in_resource_calendar(
     )
     assert url_request() == [
         f"/calendars/some-calendar-id@resource.calendar.google.com/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-04-30T01:31:02%2B00:00"
+        "&timeMin=2022-04-30T01:31:02Z"
     ]
     assert result.items == [
         Event(
@@ -341,6 +345,7 @@ async def test_list_events_with_all_day_event_in_resource_calendar(
             start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
             end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
             transparency="transparent",
+            private_calendar_id="some-calendar-id@resource.calendar.google.com",
         ),
         Event(
             id="some-event-id-2",
@@ -349,6 +354,7 @@ async def test_list_events_with_all_day_event_in_resource_calendar(
             start=DateOrDatetime(date=datetime.date(2022, 4, 14)),
             end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
             transparency="opaque",
+            private_calendar_id="some-calendar-id@resource.calendar.google.com",
         ),
     ]
     assert result.page_token is None
@@ -489,6 +495,7 @@ async def test_event_missing_summary(
             start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
             end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
             transparency="transparent",
+            private_calendar_id="some-calendar-id",
         )
     ]
 
@@ -595,13 +602,13 @@ async def test_list_events_multiple_pages_with_iterator(
     assert url_request() == [
         # Request #1
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-04-30T01:31:02%2B00:00",
+        "&timeMin=2022-04-30T01:31:02Z",
         # Request #2
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&pageToken=page-token-1&timeMin=2022-04-30T01:31:02%2B00:00",
+        "&pageToken=page-token-1&timeMin=2022-04-30T01:31:02Z",
         # Request #3
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        "&pageToken=page-token-2&timeMin=2022-04-30T01:31:02%2B00:00",
+        "&pageToken=page-token-2&timeMin=2022-04-30T01:31:02Z",
     ]
     assert items == [
         Event(
@@ -611,6 +618,7 @@ async def test_list_events_multiple_pages_with_iterator(
             start=DateOrDatetime(date=datetime.date(2022, 4, 13)),
             end=DateOrDatetime(date=datetime.date(2022, 4, 14)),
             transparency="transparent",
+            private_calendar_id="some-calendar-id",
         ),
         Event(
             id="some-event-id-2",
@@ -619,6 +627,7 @@ async def test_list_events_multiple_pages_with_iterator(
             start=DateOrDatetime(date=datetime.date(2022, 4, 14)),
             end=DateOrDatetime(date=datetime.date(2022, 4, 20)),
             transparency="opaque",
+            private_calendar_id="some-calendar-id",
         ),
     ]
     assert page_tokens == ["page-token-1", "page-token-2", None]
@@ -641,7 +650,7 @@ async def test_list_event_url_encoding(
     )
     assert url_request() == [
         f"/calendars/en.usa#holiday@group.v.calendar.google.com/events?{EVENT_LIST_PARAMS}"
-        "&timeMin=2022-04-30T01:31:02%2B00:00"
+        "&timeMin=2022-04-30T01:31:02Z"
     ]
 
 

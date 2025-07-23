@@ -51,7 +51,7 @@ def _items_func(
     for item in result.items:
         if not item.id:
             continue
-        items[item.id] = json.loads(item.json())
+        items[item.id] = json.loads(item.model_dump_json())
     return items
 
 
@@ -191,14 +191,17 @@ class CalendarEventSyncManager:
                 _LOGGER.debug(
                     "Performing full calendar sync for calendar %s", self._calendar_id
                 )
-                return self._request_template.copy()
+                return self._request_template.model_copy()
             _LOGGER.debug(
                 "Performing incremental sync for calendar %s (%s)",
                 self._calendar_id,
                 sync_token,
             )
-            return self._request_template.copy(
-                include={"calendar_id"}, update={"sync_token": sync_token}
+            return self._request_template.model_validate(
+                {
+                    **self._request_template.model_dump(include={"calendar_id"}),
+                    **{"sync_token": sync_token}
+                }
             )
 
         store_data = await self._store.async_load() or {}
