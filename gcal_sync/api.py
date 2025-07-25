@@ -24,17 +24,10 @@ import enum
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import Any, List, Optional, cast
+from typing import Any, List, Optional, Self, TypeVar, Union, cast
 from urllib.request import pathname2url
 
-try:
-    from pydantic.v1 import Field, root_validator, validator
-except ImportError:
-    from pydantic import (  # type: ignore
-        Field,
-        root_validator,
-        validator,
-    )
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from .auth import AbstractAuth
 from .const import ITEMS
@@ -118,18 +111,23 @@ def now() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
 
-def _validate_datetime(values: dict[str, Any], key: str) -> dict[str, Any]:
+_RequestT = TypeVar(
+    "_RequestT",
+    bound="Union[ListEventsRequest, _RawListEventsRequest, LocalListEventsRequest]"
+)
+
+def _validate_datetime(self: _RequestT, key: str) -> _RequestT:
     """Validate date/datetime request fields are set properly."""
-    if time := values.get(key):
-        values[key] = time.replace(microsecond=0)
-    return values
+    if time := self.__dict__.get(key):
+        self.__dict__[key] = time.replace(microsecond=0)
+    return self
 
 
-def _validate_datetimes(values: dict[str, Any]) -> dict[str, Any]:
+def _validate_datetimes(self: _RequestT) -> _RequestT:
     """Validate the date or datetime fields are set properly."""
-    values = _validate_datetime(values, "start_time")
-    values = _validate_datetime(values, "end_time")
-    return values
+    self = _validate_datetime(self, "start_time")
+    self = _validate_datetime(self, "end_time")
+    return self
 
 
 class ListEventsRequest(SyncableRequest):
@@ -138,7 +136,9 @@ class ListEventsRequest(SyncableRequest):
     calendar_id: str = Field(alias="calendarId")
     """Calendar identifier."""
 
-    start_time: Optional[datetime.datetime] = Field(default=None, alias="timeMin")
+    start_time: Optional[datetime.datetime] = Field(
+        default=None, alias="timeMin", validate_default=True
+    )
     """Lower bound (exclusive) for an event's end time to filter by."""
 
     end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
@@ -154,27 +154,26 @@ class ListEventsRequest(SyncableRequest):
     def to_request(self) -> _RawListEventsRequest:
         """Convert to the raw API request for sending to the API."""
         return _RawListEventsRequest(
-            **json.loads(self.json(exclude_none=True, by_alias=True)),
+            **json.loads(self.model_dump_json(exclude_none=True, by_alias=True)),
             single_events=Boolean.TRUE,
             order_by=OrderBy.START_TIME,
         )
 
-    @validator("start_time", always=True)
+    @field_validator("start_time")
+    @classmethod
     def _default_start_time(cls, value: datetime.datetime | None) -> datetime.datetime:
         """Select a default start time value of not specified."""
         if value is None:
             return now()
         return value
 
-    @root_validator
-    def _check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
+    @model_validator(mode="after")
+    def _check_datetime(self) -> Self:
         """Validate the date or datetime fields are set properly."""
-        return _validate_datetimes(values)
+        return _validate_datetimes(self)
 
-    class Config:
-        """Pydantic model configuration."""
 
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SyncEventsRequest(ListEventsRequest):
@@ -189,11 +188,14 @@ class SyncEventsRequest(ListEventsRequest):
     def to_request(self) -> _RawListEventsRequest:
         """Disables default value behavior."""
         return _RawListEventsRequest(
-            **json.loads(self.json(exclude_none=True, by_alias=True))
+            **json.loads(self.model_dump_json(exclude_none=True, by_alias=True))
         )
 
-    @validator("start_time", always=True)
-    def _default_start_time(cls, value: datetime.datetime) -> datetime.datetime:
+    @field_validator("start_time")
+    @classmethod
+    def _default_start_time(  # type: ignore[override]
+        cls, value: datetime.datetime | None
+    ) -> datetime.datetime | None:
         """Disables default value behavior."""
         return value
 
@@ -224,8 +226,8 @@ class _RawListEventsRequest(CalendarBaseModel):
 
     calendar_id: str = Field(alias="calendarId")
     max_results: int = Field(default=EVENT_PAGE_SIZE, alias="maxResults")
-    single_events: Optional[Boolean] = Field(alias="singleEvents")
-    order_by: Optional[OrderBy] = Field(alias="orderBy")
+    single_events: Optional[Boolean] = Field(default=None, alias="singleEvents")
+    order_by: Optional[OrderBy] = Field(default=None, alias="orderBy")
     fields: str = Field(default=EVENT_API_FIELDS)
     page_token: Optional[str] = Field(default=None, alias="pageToken")
     sync_token: Optional[str] = Field(default=None, alias="syncToken")
@@ -238,35 +240,34 @@ class _RawListEventsRequest(CalendarBaseModel):
         return cast(
             dict[str, Any],
             json.loads(
-                self.json(exclude_none=True, by_alias=True, exclude={"calendar_id"})
+                self.model_dump_json(
+                    exclude_none=True, by_alias=True, exclude={"calendar_id"}
+                )
             ),
         )
 
-    @root_validator
-    def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
+    @model_validator(mode="after")
+    def check_datetime(self) -> Self:
         """Validate the date or datetime fields are set properly."""
-        return _validate_datetimes(values)
+        return _validate_datetimes(self)
 
-    @root_validator
-    def check_sync_token_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+    @model_validator(mode="after")
+    def check_sync_token_fields(self) -> Self:
         """Validate the set of fields present when using a sync token."""
-        if not values.get("sync_token"):
-            return values
+        if not self.sync_token:
+            return self
         if (
-            values.get("order_by")
-            or values.get("search")
-            or values.get("time_min")
-            or values.get("time_max")
+            self.order_by
+            or self.search
+            or self.start_time
+            or self.end_time
         ):
             raise ValueError(
-                f"Specified request params not compatible with sync_token: {values}"
+                f"Specified request params not compatible with sync_token: {self}"
             )
-        return values
+        return self
 
-    class Config:
-        """Model configuration."""
-
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class _ListEventsResponseModel(SyncableResponse):
@@ -274,7 +275,8 @@ class _ListEventsResponseModel(SyncableResponse):
 
     items: List[Event] = []
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def _propagate_calendar_id(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Propagate the calendar id attribute down to the events in the response.
 
@@ -348,7 +350,7 @@ class GoogleCalendarService:
         """Return the list of calendars the user has added to their list."""
         params = {}
         if request:
-            params = json.loads(request.json(exclude_none=True, by_alias=True))
+            params = json.loads(request.model_dump_json(exclude_none=True, by_alias=True))
         result = await self._auth.get_json(CALENDAR_LIST_URL, params=params)
         return CalendarListResponse(**result)
 
@@ -398,7 +400,7 @@ class GoogleCalendarService:
             CALENDAR_EVENTS_URL.format(calendar_id=pathname2url(request.calendar_id)),
             params=params,
         )
-        _ListEventsResponseModel.update_forward_refs()
+        _ListEventsResponseModel.model_rebuild()
         response = _ListEventsResponseModel(
             **result, private_calendar_id=request.calendar_id
         )
@@ -410,7 +412,7 @@ class GoogleCalendarService:
         event: Event,
     ) -> None:
         """Create an event on the specified calendar."""
-        body = json.loads(event.json(exclude_unset=True, by_alias=True))
+        body = json.loads(event.model_dump_json(exclude_unset=True, by_alias=True))
         await self._auth.post(
             CALENDAR_EVENTS_URL.format(calendar_id=pathname2url(calendar_id)),
             json=body,
@@ -461,15 +463,12 @@ class LocalListEventsRequest(CalendarBaseModel):
     end_time: Optional[datetime.datetime] = Field(default=None)
     """Upper bound (exclusive) for an event's start time to filter by."""
 
-    @root_validator
-    def check_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
+    @model_validator(mode="after")
+    def check_datetime(self) -> Self:
         """Validate the date or datetime fields are set properly."""
-        return _validate_datetimes(values)
+        return _validate_datetimes(self)
 
-    class Config:
-        """Model configuration."""
-
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class LocalListEventsResponse(CalendarBaseModel):
@@ -635,7 +634,7 @@ class CalendarEventStoreService:
                 start=event.start,
                 end=event.end,
             )
-            body = json.loads(cancelled_event.json(exclude_unset=True, by_alias=True))
+            body = json.loads(cancelled_event.model_dump_json(exclude_unset=True, by_alias=True))
             del body["start"]
             del body["end"]
             await self._api.async_patch_event(self._calendar_id, event_id, body)
@@ -662,7 +661,7 @@ class CalendarEventStoreService:
             start=event.start,
             end=event.end,
         )
-        body = json.loads(updated_event.json(exclude_unset=True, by_alias=True))
+        body = json.loads(updated_event.model_dump_json(exclude_unset=True, by_alias=True))
         del body["start"]
         del body["end"]
         await self._api.async_patch_event(self._calendar_id, event.id, body)

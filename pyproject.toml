@@ -14,7 +14,7 @@ requires-python = ">=3.10"
 classifiers = []
 dependencies = [
   "aiohttp>=3.8.1",
-  "ical>=8.3.0",
+  "ical>=10.0.4",
   "pydantic>=2.10.4",
 ]
 
@@ -25,7 +25,7 @@ Source = "https://github.com/allenporter/gcal_sync"
 include = ["gcal_sync*"]
 
 [tool.mypy]
-plugins = "pydantic.v1.mypy"
+plugins = "pydantic.mypy"
 exclude = [
   "venv/",
 ]

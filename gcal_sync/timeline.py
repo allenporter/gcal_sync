@@ -64,7 +64,7 @@ class RecurAdapter:
             if not self._event.id:
                 raise ValueError("Expected event to have event id")
             event_id = SyntheticEventId.of(self._event.id, dtstart)
-            return self._event.copy(
+            return self._event.model_copy(
                 deep=True,
                 update={
                     "start": DateOrDatetime.parse(dtstart),

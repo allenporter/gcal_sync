@@ -13,20 +13,19 @@ from functools import cache
 import zoneinfo
 from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, Optional, Self, Union
 
 from ical.component import ComponentModel
 from ical.recurrence import Recurrences
 from ical.exceptions import CalendarParseError
 from ical.iter import RulesetIterable
 from ical.timespan import Timespan
-from ical.types.data_types import DATA_TYPE
+from ical.types.data_types import serialize_field
 from ical.types.recur import Frequency, Recur
 
-try:
-    from pydantic.v1 import BaseModel, Field, root_validator, ValidationError
-except ImportError:
-    from pydantic import BaseModel, Field, root_validator, ValidationError  # type: ignore
+from pydantic import (
+    BaseModel, ConfigDict, Field, field_serializer, model_validator, ValidationError
+)
 
 from .exceptions import CalendarParseException
 
@@ -123,7 +122,8 @@ class CalendarBaseModel(BaseModel):
         except ValidationError as err:
             raise _raise_parse_exception(self.__class__.__name__.upper(), err) from err
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def _remove_self(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Rename any 'self' fields from all child values of the dictionary."""
         if "self" in values:
@@ -134,9 +134,9 @@ class CalendarBaseModel(BaseModel):
         updates = {}
         for k, v in values.items():
             if isinstance(v, dict):
-                updates[k] = cls._remove_self(v)
+                updates[k] = cls._remove_self(v)  # type: ignore[operator]
             elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
-                updates[k] = [cls._remove_self(item) for item in v]
+                updates[k] = [cls._remove_self(item) for item in v]  # type: ignore[operator]
         values.update(updates)
 
         return values
@@ -175,10 +175,7 @@ class Calendar(CalendarBaseModel):
     foreground_color: Optional[str] = Field(alias="foregroundColor", default=None)
     """The foreground color of the calendar in the hexadecimal format "#ffffff"."""
 
-    class Config:
-        """Pydnatic model configuration."""
-
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class CalendarBasic(CalendarBaseModel):
@@ -199,10 +196,7 @@ class CalendarBasic(CalendarBaseModel):
     timezone: Optional[str] = Field(alias="timeZone", default=None)
     """The time zone of the calendar."""
 
-    class Config:
-        """Pydnatic model configuration."""
-
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class DateOrDatetime(CalendarBaseModel):
@@ -260,24 +254,20 @@ class DateOrDatetime(CalendarBaseModel):
             value = value.replace(tzinfo=(tzinfo if tzinfo else datetime.timezone.utc))
         return value
 
-    @root_validator
-    def _check_date_or_datetime(cls, values: dict[str, Any]) -> dict[str, Any]:
+    @model_validator(mode="after")
+    def _check_date_or_datetime(self) -> Self:
         """Validate the date or datetime fields are set properly."""
-        if not values.get("date") and not values.get("date_time"):
+        if not self.date and not self.date_time:
             raise ValueError("Unexpected missing date or dateTime value")
         # Truncate microseconds for datetime serialization back to json
-        if datetime_value := values.get("date_time"):
+        if datetime_value := self.date_time:
             if isinstance(datetime_value, datetime.datetime):
-                values["date_time"] = datetime_value.replace(microsecond=0)
-        elif values.get("timezone"):
+                self.date_time = datetime_value.replace(microsecond=0)
+        elif self.timezone:
             raise ValueError("Timezone with date (only) not supported")
-        return values
+        return self
 
-    class Config:
-        """Model configuration."""
-
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
 
 
 class EventStatusEnum(str, Enum):
@@ -379,8 +369,7 @@ class Attendee(CalendarBaseModel):
     )
     """The attendee's response status."""
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SyntheticEventId:
@@ -528,12 +517,9 @@ class Recurrence(ComponentModel):
         """Serialize the recurrence rule as an API string."""
         return [prop.ics() for prop in self.__encode_component_root__().properties]
 
-    class Config:
-        """Configuration for IcsCalendarStream pydantic model."""
+    model_config = ConfigDict(validate_assignment=True, populate_by_name=True)
 
-        json_encoders = DATA_TYPE.encode_property_json
-        validate_assignment = True
-        allow_population_by_field_name = True
+    serialize_fields = field_serializer("*")(serialize_field)  # type: ignore[pydantic-field]
 
 
 class ReminderMethod(str, Enum):
@@ -569,8 +555,7 @@ class Reminders(CalendarBaseModel):
     set for this event. The maximum number of override reminders is 5.
     """
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class Event(CalendarBaseModel):
@@ -667,7 +652,8 @@ class Event(CalendarBaseModel):
             return []
         return self.recur.as_rrule(self.start.value)
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def _allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Special case for canceled event tombstones missing required fields."""
         if status := values.get("status"):
@@ -678,7 +664,8 @@ class Event(CalendarBaseModel):
                     values["end"] = DateOrDatetime(date=datetime.date.min)
         return values
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def _adjust_visibility(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Convert legacy visibility types to new types."""
         if visibility := values.get("visibility"):
@@ -686,7 +673,20 @@ class Event(CalendarBaseModel):
                 values["visibility"] = "private"
         return values
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
+    def _validate_recur(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Remove rrule property parameters not supported by dateutil.rrule."""
+        if not values.get("recurrence"):
+            return values
+        try:
+            values["recur"] = Recurrence.from_recurrence(values["recurrence"])
+        except CalendarParseError as err:
+            raise ValueError(f"Failed to parse recurrence: {err}") from err
+        return values
+
+    @model_validator(mode="before")
+    @classmethod
     def _adjust_invalid_recurrence_rules(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Fix invalid rrule parameters not supported by dateutil.rrule."""
         if not (recurrence_values := values.get("recurrence")):
@@ -701,48 +701,37 @@ class Event(CalendarBaseModel):
         values["recurrence"] = updated
         return values
 
-    @root_validator(pre=True)
-    def _validate_recur(cls, values: dict[str, Any]) -> dict[str, Any]:
-        """Remove rrule property parameters not supported by dateutil.rrule."""
-        if not values.get("recurrence"):
-            return values
-        try:
-            values["recur"] = Recurrence.from_recurrence(values["recurrence"])
-        except CalendarParseError as err:
-            raise ValueError(f"Failed to parse recurrence: {err}") from err
-        return values
-
-    @root_validator
-    def _adjust_duration(cls, values: dict[str, Any]) -> dict[str, Any]:
+    @model_validator(mode="after")
+    def _adjust_duration(self) -> Self:
         """Fix events with invalid durations."""
         if (
-            (dtstart := values.get("start"))
-            and (dtend := values.get("end"))
+            (dtstart := self.start)
+            and (dtend := self.end)
             and (dtend.value - dtstart.value) <= datetime.timedelta(seconds=0)
         ):
             if dtstart.date and dtend.date:
                 dtend.date = dtstart.date + datetime.timedelta(days=1)
-                values["end"] = dtend
+                self.end = dtend
             if dtstart.date_time and dtend.date_time:
                 dtend.date_time = dtstart.date_time + datetime.timedelta(minutes=30)
-                values["end"] = dtend
-        return values
+                self.end = dtend
+        return self
 
-    @root_validator
-    def _validate_rrule(cls, values: dict[str, Any]) -> dict[str, Any]:
+    @model_validator(mode="after")
+    def _validate_rrule(self) -> Self:
         """The API returns invalid RRULEs that need to be coerced to valid."""
         # Rules may need updating of start time has a timezone
-        if not (recur := values.get("recur")) or not (dtstart := values.get("start")):
-            return values
+        if not (recur := self.recur) or not (dtstart := self.start):
+            return self
         for rule in recur.rrule:
-            cls._adjust_rrule(rule, dtstart)
+            self._adjust_rrule(rule, dtstart)
         recur.exdate = [
-            cls._adjust_recurrence_date(exdate, dtstart) for exdate in recur.exdate
+            self._adjust_recurrence_date(exdate, dtstart) for exdate in recur.exdate
         ]
         recur.rdate = [
-            cls._adjust_recurrence_date(rdate, dtstart) for rdate in recur.rdate
+            self._adjust_recurrence_date(rdate, dtstart) for rdate in recur.rdate
         ]
-        return values
+        return self
 
     @classmethod
     def _adjust_rrule(cls, rule: Recur, dtstart: DateOrDatetime) -> Recur:
@@ -781,7 +770,8 @@ class Event(CalendarBaseModel):
                 return date_value.date()
         return date_value
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def _adjust_unknown_event_type(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Validate the event type."""
         if event_type := values.get("eventType"):
@@ -790,23 +780,23 @@ class Event(CalendarBaseModel):
                 values["eventType"] = EventTypeEnum.UNKNOWN
         return values
 
-    @root_validator
-    def _adjust_resource_all_day_event(cls, values: dict[str, Any]) -> dict[str, Any]:
+    @model_validator(mode="after")
+    def _adjust_resource_all_day_event(self) -> Self:
         """Fix a bug in google calendar resources where all day events are incorrect."""
         if (
-            (calendar_id := values.get("private_calendar_id"))
+            (calendar_id := self.private_calendar_id)
             and calendar_id.endswith(RESOURCE_ID_SUFFIX)
-            and (dtstart := values.get("start"))
-            and (dtend := values.get("end"))
+            and (dtstart := self.start)
+            and (dtend := self.end)
             and dtstart.date_time
-            and dtstart.date_time
-            and dtend.date_time.time() == MIDNIGHT
+            and dtend.date_time
+            and dtstart.date_time.time() == MIDNIGHT
             and dtend.date_time.time() == MIDNIGHT
         ):
             _LOGGER.debug("Fixing all day event for resource calendar: %s", calendar_id)
-            values["start"] = DateOrDatetime(date=dtstart.date_time.date())
-            values["end"] = DateOrDatetime(date=dtend.date_time.date())
-        return values
+            self.start = DateOrDatetime(date=dtstart.date_time.date())
+            self.end = DateOrDatetime(date=dtend.date_time.date())
+        return self
 
     @property
     def timespan(self) -> Timespan:
@@ -850,7 +840,4 @@ class Event(CalendarBaseModel):
             return NotImplemented
         return self.timespan >= other.timespan
 
-    class Config:
-        """Model configuration."""
-
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)

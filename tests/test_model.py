@@ -37,7 +37,7 @@ EXCLUDED_FIELDS = {"recur", "private_calendar_id"}
 def test_calendar() -> None:
     """Exercise basic parsing of a calendar API response."""
 
-    calendar = Calendar.parse_obj(
+    calendar = Calendar.model_validate(
         {
             "kind": "calendar#calendarListEntry",
             "id": "some-calendar-id",
@@ -65,7 +65,7 @@ def test_calendar() -> None:
 def test_calendar_timezone() -> None:
     """Exercise basic parsing of a calendar API response."""
 
-    calendar = Calendar.parse_obj(
+    calendar = Calendar.model_validate(
         {
             "kind": "calendar#calendarListEntry",
             "id": "some-calendar-id",
@@ -87,7 +87,7 @@ def test_calendar_timezone() -> None:
 def test_event_with_date() -> None:
     """Exercise basic parsing of an event API response."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "kind": "calendar#event",
             "id": "some-event-id",
@@ -126,7 +126,7 @@ def test_event_with_date() -> None:
 def test_event_datetime() -> None:
     """Exercise basic parsing of an event API response."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "kind": "calendar#event",
             "id": "some-event-id",
@@ -177,7 +177,7 @@ def test_invalid_datetime() -> None:
     }
 
     with pytest.raises(CalendarParseException):
-        Event.parse_obj(
+        Event.model_validate(
             {
                 **base_event,
                 "start": {},
@@ -185,7 +185,7 @@ def test_invalid_datetime() -> None:
         )
 
     with pytest.raises(CalendarParseException):
-        Event.parse_obj(
+        Event.model_validate(
             {
                 **base_event,
                 "start": {"dateTime": "invalid-datetime"},
@@ -193,7 +193,7 @@ def test_invalid_datetime() -> None:
         )
 
     with pytest.raises(CalendarParseException):
-        Event.parse_obj(
+        Event.model_validate(
             {
                 **base_event,
                 "start": {"date": "invalid-datetime"},
@@ -204,7 +204,7 @@ def test_invalid_datetime() -> None:
 def test_event_timezone() -> None:
     """Exercise a datetime with a time zone."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "kind": "calendar#event",
             "id": "some-event-id",
@@ -239,7 +239,7 @@ def test_event_timezone() -> None:
     assert event.end.timezone == "America/Regina"
     assert event.end.value == datetime.datetime(2022, 4, 12, 17, 0, 0, tzinfo=tzinfo)
 
-    assert json.loads(event.json(exclude_unset=True, by_alias=True)) == {
+    assert json.loads(event.model_dump_json(exclude_unset=True, by_alias=True)) == {
         "id": "some-event-id",
         "summary": "Event summary",
         "start": {"dateTime": "2022-04-12T16:30:00", "timeZone": "America/Regina"},
@@ -250,7 +250,7 @@ def test_event_timezone() -> None:
 def test_event_utc() -> None:
     """Exercise a datetime in UTC"""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "kind": "calendar#event",
             "id": "some-event-id",
@@ -383,7 +383,7 @@ def test_all_day_event_fix_for_resource(
 ) -> None:
     """Test adjusting incorrect resource all day events."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "kind": "calendar#event",
             "id": "some-event-id",
@@ -401,7 +401,7 @@ def test_all_day_event_fix_for_resource(
 def test_event_timezone_comparison() -> None:
     """Compare different ways the same time can be returned."""
 
-    event1 = Event.parse_obj(
+    event1 = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Event #1",
@@ -415,7 +415,7 @@ def test_event_timezone_comparison() -> None:
             },
         }
     )
-    event2 = Event.parse_obj(
+    event2 = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Event #2",
@@ -445,7 +445,7 @@ def test_event_timezone_comparison() -> None:
 def test_event_timezone_comparison_timetone_not_used() -> None:
     """Compare different ways the same time can be returned."""
 
-    event1 = Event.parse_obj(
+    event1 = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Event #1",
@@ -459,7 +459,7 @@ def test_event_timezone_comparison_timetone_not_used() -> None:
             },
         }
     )
-    event2 = Event.parse_obj(
+    event2 = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Event #2",
@@ -490,7 +490,7 @@ def test_event_timezone_comparison_timetone_not_used() -> None:
 def test_event_cancelled() -> None:
     """Exercise basic parsing of an event API response."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "some-event-id",
             "status": "cancelled",
@@ -507,7 +507,7 @@ def test_required_fields() -> None:
     """Exercise required fields for normal non-deleted events."""
 
     with pytest.raises(CalendarParseException):
-        Event.parse_obj(
+        Event.model_validate(
             {
                 "id": "some-event-id",
                 "status": "confirmed",
@@ -530,7 +530,7 @@ def test_required_fields() -> None:
 def test_event_type(api_event_type: str, event_type: EventTypeEnum) -> None:
     """Exercise basic parsing of an event API response."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "some-event-id",
             "eventType": api_event_type,
@@ -560,7 +560,7 @@ def test_event_type(api_event_type: str, event_type: EventTypeEnum) -> None:
 def test_visibility_enum(api_visibility: str, visibility: VisibilityEnum) -> None:
     """Exercise basic parsing of an event API response."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "some-event-id",
             "visibility": api_visibility,
@@ -581,7 +581,7 @@ def test_visibility_enum(api_visibility: str, visibility: VisibilityEnum) -> Non
 def test_attendees() -> None:
     """Test event attendees."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Event summary",
@@ -657,7 +657,7 @@ def test_attendees() -> None:
 def test_recurring_event() -> None:
     """Test fields set for a recurring event."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "a0033414ffas_20221012",
             "summary": "Event summary",
@@ -759,7 +759,7 @@ def test_invalid_rrule_until_format() -> None:
     with pytest.raises(
         CalendarParseException, match=r"Recurrence rule had unexpected format.*"
     ):
-        Event.parse_obj(
+        Event.model_validate(
             {
                 "summary": "Summary",
                 "start": {"date_time": "2012-11-27T18:00:00"},
@@ -773,9 +773,9 @@ def test_invalid_rrule_content_lines() -> None:
     """Test invalid RRULE parsing."""
     with pytest.raises(
         CalendarParseException,
-        match=r"Failed to parse calendar EVENT component: Failed to parse recurrence",
+        match=r"Failed to parse calendar EVENT component: Value error, Failed to parse recurrence",
     ):
-        Event.parse_obj(
+        Event.model_validate(
             {
                 "summary": "Summary",
                 "start": {"date_time": "2012-11-27T18:00:00"},
@@ -790,7 +790,7 @@ def test_invalid_rrule_until_time() -> None:
     with pytest.raises(
         CalendarParseException, match=r"Expected value to match DATE pattern.*"
     ):
-        Event.parse_obj(
+        Event.model_validate(
             {
                 "summary": "Summary",
                 "start": {"date_time": "2012-11-27T18:00:00"},
@@ -805,9 +805,9 @@ def test_event_fields_mask() -> None:
 
     assert EVENT_FIELDS == ",".join(
         [
-            field.alias
-            for field in Event.__fields__.values()
-            if field.alias not in EXCLUDED_FIELDS
+            field_name
+            for name, field in Event.model_fields.items()
+            if (field_name := (field.alias or name)) not in EXCLUDED_FIELDS
         ]
     )
 
@@ -888,7 +888,7 @@ def test_access_role_writer(access_role: AccessRole, writer: bool) -> None:
 def test_event_timezone_with_offset() -> None:
     """Verify the time parsing for a timezone and a date time with an offset."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Event #1",
@@ -915,7 +915,7 @@ def test_event_timezone_with_offset() -> None:
 def test_invalid_all_day_event_duration() -> None:
     """Verify that all day events with invalid durations are fixed."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Event #1",
@@ -937,7 +937,7 @@ def test_invalid_all_day_event_duration() -> None:
 def test_invalid_event_duration() -> None:
     """Verify that all day events with invalid durations are fixed."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Event #1",
@@ -975,7 +975,7 @@ def test_invalid_event_duration() -> None:
 def test_reminders() -> None:
     """Test event reminders."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Event summary",
