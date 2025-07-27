@@ -20,51 +20,51 @@ def mock_timeline() -> Timeline:
     """Fixture of list of all day events to use in tests."""
     return calendar_timeline(
         [
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "some-event-id-2",
                     "summary": "second",
                     "start": {
-                        "date": "2000-2-1",
+                        "date": "2000-02-01",
                     },
                     "end": {
-                        "date": "2000-2-2",
+                        "date": "2000-02-02",
                     },
                 }
             ),
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "some-event-id-4",
                     "summary": "fourth",
                     "start": {
-                        "date": "2000-4-1",
+                        "date": "2000-04-01",
                     },
                     "end": {
-                        "date": "2000-4-2",
+                        "date": "2000-04-02",
                     },
                 },
             ),
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "some-event-id-3",
                     "summary": "third",
                     "start": {
-                        "date": "2000-3-1",
+                        "date": "2000-03-01",
                     },
                     "end": {
-                        "date": "2000-3-2",
+                        "date": "2000-03-02",
                     },
                 },
             ),
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "some-event-id-1",
                     "summary": "first",
                     "start": {
-                        "date": "2000-1-1",
+                        "date": "2000-01-01",
                     },
                     "end": {
-                        "date": "2000-1-2",
+                        "date": "2000-01-02",
                     },
                 },
             ),
@@ -77,7 +77,7 @@ def mock_calendar_times() -> Timeline:
     """Fixture calendar with datetime based events to use in tests."""
     return calendar_timeline(
         [
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "some-event-id-1",
                     "summary": "first",
@@ -89,7 +89,7 @@ def mock_calendar_times() -> Timeline:
                     },
                 },
             ),
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "some-event-id-2",
                     "summary": "second",
@@ -101,7 +101,7 @@ def mock_calendar_times() -> Timeline:
                     },
                 }
             ),
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "some-event-id-3",
                     "summary": "third",
@@ -131,19 +131,19 @@ def test_date_and_datetimes() -> None:
     """Test chronological iteration of timeline with all day/non-all day events."""
     timeline = calendar_timeline(
         [
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "some-event-id-2",
                     "summary": "second",
                     "start": {
-                        "date": "2000-2-1",
+                        "date": "2000-02-01",
                     },
                     "end": {
-                        "date": "2000-2-2",
+                        "date": "2000-02-02",
                     },
                 }
             ),
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "some-event-id-1",
                     "summary": "first",
@@ -155,15 +155,15 @@ def test_date_and_datetimes() -> None:
                     },
                 },
             ),
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "some-event-id-3",
                     "summary": "third",
                     "start": {
-                        "date": "2000-3-1",
+                        "date": "2000-03-01",
                     },
                     "end": {
-                        "date": "2000-3-2",
+                        "date": "2000-03-02",
                     },
                 },
             ),
@@ -424,7 +424,7 @@ def test_all_day_with_local_timezone(
 
 def test_recurrence_dst_tz_iteration() -> None:
     """Test recurrence rule across a dst boundary."""
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Summary",
@@ -456,7 +456,7 @@ def test_recurrence_dst_tz_iteration() -> None:
 
 def test_recurrence_dst_tz_start_after() -> None:
     """Test reucrrence rule 'start_after' across a dst boundary."""
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Summary",
@@ -491,7 +491,7 @@ def test_recurrence_dst_tz_start_after() -> None:
 
 def test_invalid_rrule_until_datetime() -> None:
     """Test recurrence rule with mismatched UNTIL value from google api."""
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "event-id",
             "summary": "Summary",
@@ -510,7 +510,7 @@ def test_invalid_rrule_until_datetime() -> None:
 
 def test_invalid_rrule_until_datetime_exdate() -> None:
     """Test recurrence rule with mismatched EXDATE value from google api."""
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "event-id",
             "summary": "Summary",
@@ -532,7 +532,7 @@ def test_invalid_rrule_until_datetime_exdate() -> None:
 
 def test_invalid_rrule_until_datetime_rate() -> None:
     """Test recurrence rule with mismatched RDATE value from google api."""
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "event-id",
             "summary": "Summary",
@@ -554,7 +554,7 @@ def test_invalid_rrule_until_datetime_rate() -> None:
 
 def test_invalid_rrule_until_date() -> None:
     """Test recurrence rule with mismatched UNTIL value from google api."""
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "event-id",
             "summary": "Summary",
@@ -583,7 +583,7 @@ def test_invalid_rrule_until_date() -> None:
 
 def test_invalid_rrule_until_local_datetime() -> None:
     """Test recurrence rule with mismatched UNTIL value from google api."""
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "event-id",
             "summary": "Summary",
@@ -608,7 +608,7 @@ def test_invalid_rrule_until_local_datetime() -> None:
 
 def test_invalid_rrule_until_spurious_date() -> None:
     """Test recurrence rule with mismatched UNTIL value from google api."""
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "event-id",
             "summary": "Summary",
@@ -648,7 +648,7 @@ async def test_all_day_iter_order(
     """Test the sort order of an all day events depending on the time zone."""
     timeline = calendar_timeline(
         [
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "event-id-all-day",
                     "summary": "All Day Event",
@@ -656,7 +656,7 @@ async def test_all_day_iter_order(
                     "end": {"date": "2022-10-09"},
                 }
             ),
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "event-id-1",
                     "summary": "One",
@@ -664,7 +664,7 @@ async def test_all_day_iter_order(
                     "end": {"date_time": "2022-10-07T23:30:00+00:00"},
                 }
             ),
-            Event.parse_obj(
+            Event.model_validate(
                 {
                     "id": "event-id-2",
                     "summary": "Two",
@@ -811,7 +811,7 @@ def test_missing_event_id() -> None:
 def test_modified_recurrence() -> None:
     """Test a recurring event that was modified with a separate event from the API."""
     events = [
-        Event.parse_obj(
+        Event.model_validate(
             {
                 "id": "event-id",
                 "summary": "Summary",
@@ -829,7 +829,7 @@ def test_modified_recurrence() -> None:
             }
         ),
         # Second event was originally in series above, modified as 2 hours earlier
-        Event.parse_obj(
+        Event.model_validate(
             {
                 "id": "event-id_20221030T230000Z",
                 "summary": "Summary",
@@ -868,7 +868,7 @@ def test_modified_recurrence() -> None:
 def test_cancelled_recurrence_instancee() -> None:
     """Test a recurring event with a single instance that was cancelled from the API."""
     events = [
-        Event.parse_obj(
+        Event.model_validate(
             {
                 "id": "event-id",
                 "summary": "Summary",
@@ -886,7 +886,7 @@ def test_cancelled_recurrence_instancee() -> None:
             }
         ),
         # Second event was originally in the series above and was cancelled
-        Event.parse_obj(
+        Event.model_validate(
             {
                 "id": "event-id_20221030",
                 "status": "cancelled",
@@ -896,7 +896,7 @@ def test_cancelled_recurrence_instancee() -> None:
                 },
             }
         ),
-        Event.parse_obj(
+        Event.model_validate(
             {
                 "id": "event-id_2022113",
                 "status": "cancelled",
@@ -935,7 +935,7 @@ def test_cancelled_recurrence_instancee() -> None:
 def test_rdate_params() -> None:
     """Test recurrence rule with additional parameters unsupported by dateutil.rrule"""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "event-id",
             "summary": "Summary",
@@ -967,7 +967,7 @@ def test_rdate_params() -> None:
 def test_all_day_rrule_and_rdate() -> None:
     """Test recurrence rule with rdate and all day events."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "event-id",
             "summary": "Summary",
@@ -1004,7 +1004,7 @@ def test_all_day_rrule_and_rdate() -> None:
 def test_all_day_rrule_and_exdate() -> None:
     """Test recurrence rule with exdate."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "event-id",
             "summary": "Summary",
@@ -1042,7 +1042,7 @@ def test_all_day_rrule_and_exdate() -> None:
 def test_unknown_timezone() -> None:
     """Test timezone evaluation when the timezone returned from the API is not known."""
 
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "event-id",
             "summary": "Summary",
@@ -1071,7 +1071,7 @@ def test_unknown_timezone() -> None:
 
 def test_yearly_bymonthday_rrule() -> None:
     """Test FREQ=YEARLY rules returned from the API with BYMONTHDAY rules."""
-    event = Event.parse_obj(
+    event = Event.model_validate(
         {
             "id": "some-event-id",
             "summary": "Summary",
