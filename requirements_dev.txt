@@ -12,7 +12,7 @@ ruff==0.12.8
 
 aiohttp==3.12.15
 click==8.2.2
-freezegun==1.5.4
+freezegun==1.5.5
 ical==11.0.0
 pydantic==2.11.7
 pytest-aiohttp==1.1.0
