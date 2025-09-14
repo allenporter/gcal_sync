@@ -14,7 +14,7 @@ aiohttp==3.12.15
 click==8.2.2
 freezegun==1.5.5
 ical==11.0.0
-pydantic==2.11.7
+pydantic==2.11.9
 pytest-aiohttp==1.1.0
 pytest-asyncio==1.1.0
 pytz==2025.2
