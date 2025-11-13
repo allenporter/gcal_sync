@@ -896,8 +896,7 @@ async def test_event_sync_with_search(
     )
     await sync.run()
     assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}"
-        "&syncToken=sync-token-1"
+        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}&syncToken=sync-token-1"
     ]
 
 
@@ -962,6 +961,5 @@ async def test_event_sync_min_time(
     )
     await sync.run()
     assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}"
-        "&syncToken=sync-token-1"
+        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}&syncToken=sync-token-1"
     ]

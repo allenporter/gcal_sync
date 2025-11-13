@@ -24,7 +24,12 @@ from ical.types.data_types import serialize_field
 from ical.types.recur import Frequency, Recur
 
 from pydantic import (
-    BaseModel, ConfigDict, Field, field_serializer, model_validator, ValidationError
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    model_validator,
+    ValidationError,
 )
 
 from .exceptions import CalendarParseException
