@@ -8,6 +8,7 @@ To use this library, you create an instance of a sync manager then run the
 `run` method on a regular basis to pull down the latest information from the server. You
 may then query the latest information from the local store service.
 """
+
 # pylint: disable=duplicate-code
 from __future__ import annotations
 
@@ -200,7 +201,7 @@ class CalendarEventSyncManager:
             return self._request_template.model_validate(
                 {
                     **self._request_template.model_dump(include={"calendar_id"}),
-                    **{"sync_token": sync_token}
+                    **{"sync_token": sync_token},
                 }
             )
 

@@ -113,8 +113,9 @@ def now() -> datetime.datetime:
 
 _RequestT = TypeVar(
     "_RequestT",
-    bound="Union[ListEventsRequest, _RawListEventsRequest, LocalListEventsRequest]"
+    bound="Union[ListEventsRequest, _RawListEventsRequest, LocalListEventsRequest]",
 )
+
 
 def _validate_datetime(self: _RequestT, key: str) -> _RequestT:
     """Validate date/datetime request fields are set properly."""
@@ -172,7 +173,6 @@ class ListEventsRequest(SyncableRequest):
         """Validate the date or datetime fields are set properly."""
         return _validate_datetimes(self)
 
-
     model_config = ConfigDict(populate_by_name=True)
 
 
@@ -211,7 +211,7 @@ class OrderBy(str, enum.Enum):
 
 
 class Boolean(str, enum.Enum):
-    "Hack to support custom json encoding in pydantic." ""
+    "Hack to support custom json encoding in pydantic."
 
     TRUE = "true"
     FALSE = "false"
@@ -256,12 +256,7 @@ class _RawListEventsRequest(CalendarBaseModel):
         """Validate the set of fields present when using a sync token."""
         if not self.sync_token:
             return self
-        if (
-            self.order_by
-            or self.search
-            or self.start_time
-            or self.end_time
-        ):
+        if self.order_by or self.search or self.start_time or self.end_time:
             raise ValueError(
                 f"Specified request params not compatible with sync_token: {self}"
             )
@@ -350,7 +345,9 @@ class GoogleCalendarService:
         """Return the list of calendars the user has added to their list."""
         params = {}
         if request:
-            params = json.loads(request.model_dump_json(exclude_none=True, by_alias=True))
+            params = json.loads(
+                request.model_dump_json(exclude_none=True, by_alias=True)
+            )
         result = await self._auth.get_json(CALENDAR_LIST_URL, params=params)
         return CalendarListResponse(**result)
 
@@ -634,7 +631,9 @@ class CalendarEventStoreService:
                 start=event.start,
                 end=event.end,
             )
-            body = json.loads(cancelled_event.model_dump_json(exclude_unset=True, by_alias=True))
+            body = json.loads(
+                cancelled_event.model_dump_json(exclude_unset=True, by_alias=True)
+            )
             del body["start"]
             del body["end"]
             await self._api.async_patch_event(self._calendar_id, event_id, body)
@@ -661,7 +660,9 @@ class CalendarEventStoreService:
             start=event.start,
             end=event.end,
         )
-        body = json.loads(updated_event.model_dump_json(exclude_unset=True, by_alias=True))
+        body = json.loads(
+            updated_event.model_dump_json(exclude_unset=True, by_alias=True)
+        )
         del body["start"]
         del body["end"]
         await self._api.async_patch_event(self._calendar_id, event.id, body)
