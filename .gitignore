@@ -20,10 +20,6 @@ parts/
 sdist/
 var/
 wheels/
-<<<<<<< ours
-pip-wheel-metadata/
-=======
->>>>>>> theirs
 share/python-wheels/
 *.egg-info/
 .installed.cfg
@@ -85,9 +81,6 @@ target/
 # IPython
 profile_default/
 ipython_config.py
-
-# pyenv
-.python-version
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
 .pdm.toml
