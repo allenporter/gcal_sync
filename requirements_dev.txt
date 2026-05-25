@@ -10,7 +10,7 @@ ruff==0.15.14
 
 
 aiohttp==3.13.5
-click==8.3.1
+click==8.4.1
 freezegun==1.5.5
 ical==13.2.5
 pydantic==2.12.5
