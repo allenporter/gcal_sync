@@ -162,7 +162,9 @@ class CalendarEventSyncManager:
         if request_template is None:
             if not calendar_id:
                 raise ValueError("Required either calendar_id or request_template")
-            self._request_template = SyncEventsRequest(calendar_id=calendar_id)
+            self._request_template = SyncEventsRequest.model_validate(
+                {"calendar_id": calendar_id}
+            )
         else:
             self._request_template = request_template
         self._calendar_id = self._request_template.calendar_id
