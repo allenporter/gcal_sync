@@ -126,4 +126,7 @@ dmypy.json
 
 # VSCode
 .vscode/*
+# ty
+.ty_cache/
+
 .DS_Store
