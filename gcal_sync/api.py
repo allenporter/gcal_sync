@@ -398,8 +398,8 @@ class GoogleCalendarService:
             params=params,
         )
         _ListEventsResponseModel.model_rebuild()
-        response = _ListEventsResponseModel(
-            **result, private_calendar_id=request.calendar_id
+        response = _ListEventsResponseModel.model_validate(
+            {**result, "private_calendar_id": request.calendar_id}
         )
         return response
 
