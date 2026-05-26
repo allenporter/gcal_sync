@@ -117,6 +117,24 @@ def _raise_parse_exception(
     return CalendarParseException(error_str, detailed_error=str(err))
 
 
+def _remove_self_fields(values: dict[str, Any]) -> dict[str, Any]:
+    """Rename any 'self' fields from all child values of the dictionary."""
+    if "self" in values:
+        values["is_self"] = values["self"]
+        del values["self"]
+
+    # Mutate any children with "self" fields
+    updates = {}
+    for k, v in values.items():
+        if isinstance(v, dict):
+            updates[k] = _remove_self_fields(v)
+        elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+            updates[k] = [_remove_self_fields(item) for item in v]
+    values.update(updates)
+
+    return values
+
+
 class CalendarBaseModel(BaseModel):
     """Base class for calendar models."""
 
@@ -131,20 +149,7 @@ class CalendarBaseModel(BaseModel):
     @classmethod
     def _remove_self(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Rename any 'self' fields from all child values of the dictionary."""
-        if "self" in values:
-            values["is_self"] = values["self"]
-            del values["self"]
-
-        # Mutate any children with "self" fields
-        updates = {}
-        for k, v in values.items():
-            if isinstance(v, dict):
-                updates[k] = cls._remove_self(v)  # type: ignore[operator]
-            elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
-                updates[k] = [cls._remove_self(item) for item in v]  # type: ignore[operator]
-        values.update(updates)
-
-        return values
+        return _remove_self_fields(values)
 
 
 class Calendar(CalendarBaseModel):
@@ -221,7 +226,7 @@ class DateOrDatetime(CalendarBaseModel):
     def parse(cls, value: datetime.date | datetime.datetime) -> DateOrDatetime:
         """Create a DateOrDatetime from a raw date or datetime value."""
         if isinstance(value, datetime.datetime):
-            return cls(date_time=value)
+            return cls(dateTime=value)
         return cls(date=value)
 
     @property

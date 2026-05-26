@@ -156,13 +156,15 @@ class ListEventsRequest(SyncableRequest):
         """Convert to the raw API request for sending to the API."""
         return _RawListEventsRequest(
             **json.loads(self.model_dump_json(exclude_none=True, by_alias=True)),
-            single_events=Boolean.TRUE,
-            order_by=OrderBy.START_TIME,
+            singleEvents=Boolean.TRUE,
+            orderBy=OrderBy.START_TIME,
         )
 
     @field_validator("start_time")
     @classmethod
-    def _default_start_time(cls, value: datetime.datetime | None) -> datetime.datetime:
+    def _default_start_time(
+        cls, value: datetime.datetime | None
+    ) -> datetime.datetime | None:
         """Select a default start time value of not specified."""
         if value is None:
             return now()
@@ -193,7 +195,7 @@ class SyncEventsRequest(ListEventsRequest):
 
     @field_validator("start_time")
     @classmethod
-    def _default_start_time(  # type: ignore[override]
+    def _default_start_time(
         cls, value: datetime.datetime | None
     ) -> datetime.datetime | None:
         """Disables default value behavior."""

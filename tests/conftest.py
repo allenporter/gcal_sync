@@ -69,9 +69,9 @@ async def handler(request: aiohttp.web.Request) -> aiohttp.web.Response:
 
 
 @pytest.fixture
-async def request_handler() -> (
-    Callable[[aiohttp.web.Request], Awaitable[aiohttp.web.Response]]
-):
+async def request_handler() -> Callable[
+    [aiohttp.web.Request], Awaitable[aiohttp.web.Response]
+]:
     """A fake request handler."""
     return handler
 
