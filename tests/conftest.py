@@ -87,6 +87,7 @@ def mock_app() -> aiohttp.web.Application:
 
     app.router.add_get("/users/me/calendarList", handler)
     app.router.add_get("/calendars/{calendarId}", handler)
+    app.router.add_get("/colors", handler)
 
     app.router.add_get("/calendars/{calendarId}/events", handler)
     app.router.add_post("/calendars/{calendarId}/events", handler)

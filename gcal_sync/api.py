@@ -36,6 +36,7 @@ from .model import (
     CalendarBaseModel,
     Calendar,
     CalendarBasic,
+    Colors,
     Event,
     EventStatusEnum,
     SyntheticEventId,
@@ -68,6 +69,7 @@ EVENT_PAGE_SIZE = 1000
 EVENT_API_FIELDS = f"kind,nextPageToken,nextSyncToken,items({EVENT_FIELDS})"
 
 CALENDAR_ID = "calendarId"
+COLORS_URL = "colors"
 CALENDAR_LIST_URL = "users/me/calendarList"
 CALENDAR_GET_URL = "calendars/{calendar_id}"
 CALENDAR_EVENTS_URL = "calendars/{calendar_id}/events"
@@ -359,6 +361,17 @@ class GoogleCalendarService:
             CALENDAR_GET_URL.format(calendar_id=calendar_id)
         )
         return CalendarBasic(**result)
+
+    async def async_get_colors(self) -> Colors:
+        """Return the color definitions for calendars and events.
+
+        This can be used to resolve a `Calendar` colorId or an `Event.color_id`
+        to the corresponding hexadecimal background/foreground color values.
+        The color palette rarely changes, so callers may want to cache the
+        result rather than calling this before every use.
+        """
+        result = await self._auth.get_json(COLORS_URL)
+        return Colors(**result)
 
     async def async_get_event(self, calendar_id: str, event_id: str) -> Event:
         """Return an event based on the event id."""
