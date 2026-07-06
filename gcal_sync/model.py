@@ -208,16 +208,13 @@ class Colors(CalendarBaseModel):
     or `event` respectively to resolve the hexadecimal color values.
     """
 
-    kind: Optional[str] = None
-    """Type of the resource, `"calendar#colors"`."""
-
     updated: Optional[datetime.datetime] = None
     """Last modification time of the color palette, as a RFC3339 timestamp."""
 
-    calendar: dict[str, ColorDefinition] = {}
+    calendar: dict[str, ColorDefinition] = Field(default_factory=dict)
     """A map from a `Calendar` colorId to its `ColorDefinition`."""
 
-    event: dict[str, ColorDefinition] = {}
+    event: dict[str, ColorDefinition] = Field(default_factory=dict)
     """A map from an `Event` `color_id` to its `ColorDefinition`."""
 
 

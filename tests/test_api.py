@@ -83,7 +83,6 @@ async def test_get_colors(
     calendar_service = await calendar_service_cb()
     result = await calendar_service.async_get_colors()
     assert result == Colors(
-        kind="calendar#colors",
         updated=datetime.datetime(
             2012, 4, 26, tzinfo=datetime.timezone.utc
         ),

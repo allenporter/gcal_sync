@@ -858,13 +858,22 @@ def test_colors() -> None:
             },
         }
     )
-    assert colors.kind == "calendar#colors"
     assert colors.calendar["1"] == ColorDefinition(
         background="#ac725e", foreground="#1d1d1d"
     )
     assert colors.event["11"] == ColorDefinition(
         background="#dc2127", foreground="#1d1d1d"
     )
+
+
+def test_colors_default_dicts_are_independent() -> None:
+    """Each Colors instance should get its own dict, not a shared default."""
+
+    colors_a = Colors()
+    colors_b = Colors()
+    colors_a.calendar["1"] = ColorDefinition(background="#ac725e", foreground="#1d1d1d")
+    assert colors_a.calendar
+    assert not colors_b.calendar
 
 
 def test_event_fields_mask() -> None:
