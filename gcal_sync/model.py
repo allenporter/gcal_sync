@@ -48,6 +48,8 @@ __all__ = [
     "ReminderMethod",
     "AccessRole",
     "CalendarBasic",
+    "ColorDefinition",
+    "Colors",
 ]
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,9 +57,9 @@ _LOGGER = logging.getLogger(__name__)
 
 DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
-    "id,iCalUID,summary,start,end,description,location,transparency,status,eventType,"
-    "visibility,attendees,attendeesOmitted,recurrence,recurringEventId,originalStartTime,"
-    "reminders"
+    "id,iCalUID,summary,start,end,description,location,colorId,transparency,status,"
+    "eventType,visibility,attendees,attendeesOmitted,recurrence,recurringEventId,"
+    "originalStartTime,reminders"
 )
 MIDNIGHT = datetime.time()
 ID_DELIM = "_"
@@ -186,6 +188,34 @@ class Calendar(CalendarBaseModel):
     """The foreground color of the calendar in the hexadecimal format "#ffffff"."""
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class ColorDefinition(CalendarBaseModel):
+    """A single color definition used by a `Calendar` or `Event`."""
+
+    background: str
+    """The background color in the hexadecimal format "#0088aa"."""
+
+    foreground: str
+    """The foreground color that can be used to write on top of the background color, in the hexadecimal format "#ffffff"."""
+
+
+class Colors(CalendarBaseModel):
+    """The set of colors defined for `Calendar` and `Event` entities.
+
+    Returned by `GoogleCalendarService.async_get_colors`. Use the `calendar_id`
+    of a `Calendar` or the `color_id` of an `Event` as the key into `calendar`
+    or `event` respectively to resolve the hexadecimal color values.
+    """
+
+    updated: Optional[datetime.datetime] = None
+    """Last modification time of the color palette, as a RFC3339 timestamp."""
+
+    calendar: dict[str, ColorDefinition] = Field(default_factory=dict)
+    """A map from a `Calendar` colorId to its `ColorDefinition`."""
+
+    event: dict[str, ColorDefinition] = Field(default_factory=dict)
+    """A map from an `Event` `color_id` to its `ColorDefinition`."""
 
 
 class CalendarBasic(CalendarBaseModel):
@@ -596,6 +626,14 @@ class Event(CalendarBaseModel):
 
     location: Optional[str] = None
     """Geographic location of the event as free-form text."""
+
+    color_id: Optional[str] = Field(alias="colorId", default=None)
+    """The color of the event.
+
+    This is an id referring to an entry in the `event` section of the response
+    returned by `GoogleCalendarService.async_get_colors`, which contains the
+    corresponding hexadecimal background and foreground color values.
+    """
 
     transparency: str = Field(default="opaque")
     """Whether the event blocks time on the calendar.

@@ -17,6 +17,8 @@ from gcal_sync.model import (
     AccessRole,
     Calendar,
     CalendarBasic,
+    ColorDefinition,
+    Colors,
     DateOrDatetime,
     Event,
     ReminderMethod,
@@ -57,6 +59,38 @@ async def test_get_calendar(
     )
 
     assert url_request() == ["/calendars/primary"]
+
+
+async def test_get_colors(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test the colors API used to resolve a colorId to hex values."""
+
+    json_response(
+        {
+            "kind": "calendar#colors",
+            "updated": "2012-04-26T00:00:00.000Z",
+            "calendar": {
+                "1": {"background": "#ac725e", "foreground": "#1d1d1d"},
+            },
+            "event": {
+                "11": {"background": "#dc2127", "foreground": "#1d1d1d"},
+            },
+        },
+    )
+    calendar_service = await calendar_service_cb()
+    result = await calendar_service.async_get_colors()
+    assert result == Colors(
+        updated=datetime.datetime(
+            2012, 4, 26, tzinfo=datetime.timezone.utc
+        ),
+        calendar={"1": ColorDefinition(background="#ac725e", foreground="#1d1d1d")},
+        event={"11": ColorDefinition(background="#dc2127", foreground="#1d1d1d")},
+    )
+
+    assert url_request() == ["/colors"]
 
 
 async def test_list_calendars(

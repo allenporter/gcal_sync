@@ -15,6 +15,8 @@ from gcal_sync.model import (
     AccessRole,
     Attendee,
     Calendar,
+    ColorDefinition,
+    Colors,
     DateOrDatetime,
     Event,
     EventStatusEnum,
@@ -121,6 +123,47 @@ def test_event_with_date() -> None:
     assert event.end.timezone is None
     assert event.end.value == datetime.date(2022, 4, 13)
     assert event.timespan.duration == datetime.timedelta(days=1)
+
+
+def test_event_color_id() -> None:
+    """Exercise parsing of an event's colorId field."""
+
+    event = Event.model_validate(
+        {
+            "kind": "calendar#event",
+            "id": "some-event-id",
+            "status": "confirmed",
+            "summary": "Event summary",
+            "colorId": "11",
+            "start": {
+                "date": "2022-04-12",
+            },
+            "end": {
+                "date": "2022-04-13",
+            },
+        }
+    )
+    assert event.color_id == "11"
+
+
+def test_event_color_id_missing() -> None:
+    """An event with no colorId defaults to None."""
+
+    event = Event.model_validate(
+        {
+            "kind": "calendar#event",
+            "id": "some-event-id",
+            "status": "confirmed",
+            "summary": "Event summary",
+            "start": {
+                "date": "2022-04-12",
+            },
+            "end": {
+                "date": "2022-04-13",
+            },
+        }
+    )
+    assert event.color_id is None
 
 
 def test_event_datetime() -> None:
@@ -798,6 +841,39 @@ def test_invalid_rrule_until_time() -> None:
                 "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20220202T1234T;BYDAY=TU"],
             }
         )
+
+
+def test_colors() -> None:
+    """Exercise parsing of the colors API response."""
+
+    colors = Colors.model_validate(
+        {
+            "kind": "calendar#colors",
+            "updated": "2012-04-26T00:00:00.000Z",
+            "calendar": {
+                "1": {"background": "#ac725e", "foreground": "#1d1d1d"},
+            },
+            "event": {
+                "11": {"background": "#dc2127", "foreground": "#1d1d1d"},
+            },
+        }
+    )
+    assert colors.calendar["1"] == ColorDefinition(
+        background="#ac725e", foreground="#1d1d1d"
+    )
+    assert colors.event["11"] == ColorDefinition(
+        background="#dc2127", foreground="#1d1d1d"
+    )
+
+
+def test_colors_default_dicts_are_independent() -> None:
+    """Each Colors instance should get its own dict, not a shared default."""
+
+    colors_a = Colors()
+    colors_b = Colors()
+    colors_a.calendar["1"] = ColorDefinition(background="#ac725e", foreground="#1d1d1d")
+    assert colors_a.calendar
+    assert not colors_b.calendar
 
 
 def test_event_fields_mask() -> None:
