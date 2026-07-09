@@ -50,6 +50,8 @@ __all__ = [
     "CalendarBasic",
     "ColorDefinition",
     "Colors",
+    "EventLabel",
+    "LabelProperties",
 ]
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,9 +59,9 @@ _LOGGER = logging.getLogger(__name__)
 
 DATE_STR_FORMAT = "%Y-%m-%d"
 EVENT_FIELDS = (
-    "id,iCalUID,summary,start,end,description,location,colorId,transparency,status,"
-    "eventType,visibility,attendees,attendeesOmitted,recurrence,recurringEventId,"
-    "originalStartTime,reminders"
+    "id,iCalUID,summary,start,end,description,location,colorId,eventLabelId,"
+    "transparency,status,eventType,visibility,attendees,attendeesOmitted,"
+    "recurrence,recurringEventId,originalStartTime,reminders"
 )
 MIDNIGHT = datetime.time()
 ID_DELIM = "_"
@@ -218,6 +220,35 @@ class Colors(CalendarBaseModel):
     """A map from an `Event` `color_id` to its `ColorDefinition`."""
 
 
+class EventLabel(CalendarBaseModel):
+    """A custom event color label defined on a calendar.
+
+    Part of the newer `eventLabelId`-based color mechanism that supersedes
+    the older index-based `Event.color_id`/`colors` API mechanism, giving
+    calendars up to 200 custom colors instead of a fixed shared palette.
+    """
+
+    id: str
+    """Identifier for this label, referenced by an Event's `event_label_id`."""
+
+    background_color: str = Field(alias="backgroundColor")
+    """The background color for this label, in the hexadecimal format "#0088aa"."""
+
+    name: Optional[str] = None
+    """A human readable name for this label, e.g. "Work" or "Personal"."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class LabelProperties(CalendarBaseModel):
+    """The set of custom event labels defined on a calendar."""
+
+    event_labels: list[EventLabel] = Field(alias="eventLabels", default_factory=list)
+    """The custom event color labels available on this calendar."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class CalendarBasic(CalendarBaseModel):
     """Metadata associated with a calendar from the Get API."""
 
@@ -235,6 +266,16 @@ class CalendarBasic(CalendarBaseModel):
 
     timezone: Optional[str] = Field(alias="timeZone", default=None)
     """The time zone of the calendar."""
+
+    label_properties: Optional[LabelProperties] = Field(
+        alias="labelProperties", default=None
+    )
+    """The calendar's custom event color labels, if any are defined.
+
+    Use an `Event.event_label_id` as the key into this to resolve a hex
+    background color, preferring it over the older `Event.color_id`/
+    `GoogleCalendarService.async_get_colors` mechanism when both are present.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -633,6 +674,18 @@ class Event(CalendarBaseModel):
     This is an id referring to an entry in the `event` section of the response
     returned by `GoogleCalendarService.async_get_colors`, which contains the
     corresponding hexadecimal background and foreground color values.
+
+    This is superseded by `event_label_id` when present; see `event_label_id`.
+    """
+
+    event_label_id: Optional[str] = Field(alias="eventLabelId", default=None)
+    """The custom color label assigned to the event, if any.
+
+    Supersedes `color_id`. This is an id referring to an entry in the calendar's
+    own `CalendarBasic.label_properties.event_labels` (see
+    `GoogleCalendarService.async_get_calendar`), which contains the
+    corresponding hexadecimal background color. Prefer this over `color_id`
+    when both are present.
     """
 
     transparency: str = Field(default="opaque")
