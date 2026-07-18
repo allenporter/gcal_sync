@@ -13,7 +13,7 @@ from functools import cache
 import zoneinfo
 from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Optional, Self, Union, cast
+from typing import Any, Optional, Self, Union
 
 from ical.component import ComponentModel
 from ical.recurrence import Recurrences
@@ -536,6 +536,7 @@ class Recurrence(ComponentModel):
         try:
             return cls(
                 rrule=recurrences.rrule,
+                # Google Calendar does not support period objects in RDATE
                 rdate=[
                     x
                     for x in recurrences.rdate
@@ -550,10 +551,11 @@ class Recurrence(ComponentModel):
         self, dtstart: datetime.date | datetime.datetime
     ) -> Iterable[datetime.date | datetime.datetime]:
         """Return the set of recurrences as a rrule that emits start times."""
+        rdate: list[Any] = self.rdate
         return RulesetIterable(
             dtstart,
             [rule.as_rrule(dtstart) for rule in self.rrule],
-            cast(Any, self.rdate),
+            rdate,
             self.exdate,
         )
 
