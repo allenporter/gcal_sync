@@ -536,7 +536,12 @@ class Recurrence(ComponentModel):
         try:
             return cls(
                 rrule=recurrences.rrule,
-                rdate=recurrences.rdate,
+                # Google Calendar does not support period objects in RDATE
+                rdate=[
+                    x
+                    for x in recurrences.rdate
+                    if isinstance(x, (datetime.datetime, datetime.date))
+                ],
                 exdate=recurrences.exdate,
             )
         except ValidationError as err:
@@ -546,10 +551,11 @@ class Recurrence(ComponentModel):
         self, dtstart: datetime.date | datetime.datetime
     ) -> Iterable[datetime.date | datetime.datetime]:
         """Return the set of recurrences as a rrule that emits start times."""
+        rdate: list[Any] = self.rdate
         return RulesetIterable(
             dtstart,
             [rule.as_rrule(dtstart) for rule in self.rrule],
-            self.rdate,
+            rdate,
             self.exdate,
         )
 
