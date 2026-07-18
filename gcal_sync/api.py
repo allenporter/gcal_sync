@@ -667,7 +667,7 @@ class CalendarEventStoreService:
         # UNTIL is inclusive so it can't include the specified exdate. FREQ=DAILY
         # is the lowest frequency supported so subtracting one day is
         # safe and works for both dates and datetimes.
-        recur.rrule[0].count = 0
+        recur.rrule[0].count = None
         recur.rrule[0].until = synthetic_event_id.dtstart - datetime.timedelta(days=1)
         updated_event = Event(
             id=event.id,  # Primary event

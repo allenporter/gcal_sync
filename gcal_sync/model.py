@@ -13,7 +13,7 @@ from functools import cache
 import zoneinfo
 from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Optional, Self, Union
+from typing import Any, Optional, Self, Union, cast
 
 from ical.component import ComponentModel
 from ical.recurrence import Recurrences
@@ -536,7 +536,11 @@ class Recurrence(ComponentModel):
         try:
             return cls(
                 rrule=recurrences.rrule,
-                rdate=recurrences.rdate,
+                rdate=[
+                    x
+                    for x in recurrences.rdate
+                    if isinstance(x, (datetime.datetime, datetime.date))
+                ],
                 exdate=recurrences.exdate,
             )
         except ValidationError as err:
@@ -549,7 +553,7 @@ class Recurrence(ComponentModel):
         return RulesetIterable(
             dtstart,
             [rule.as_rrule(dtstart) for rule in self.rrule],
-            self.rdate,
+            cast(Any, self.rdate),
             self.exdate,
         )
 
