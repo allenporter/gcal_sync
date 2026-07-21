@@ -15,12 +15,15 @@ from gcal_sync.model import (
     AccessRole,
     Attendee,
     Calendar,
+    CalendarBasic,
     ColorDefinition,
     Colors,
     DateOrDatetime,
     Event,
+    EventLabel,
     EventStatusEnum,
     EventTypeEnum,
+    LabelProperties,
     ReminderMethod,
     ReminderOverride,
     ResponseStatus,
@@ -874,6 +877,69 @@ def test_colors_default_dicts_are_independent() -> None:
     colors_a.calendar["1"] = ColorDefinition(background="#ac725e", foreground="#1d1d1d")
     assert colors_a.calendar
     assert not colors_b.calendar
+
+
+def test_event_label_id() -> None:
+    """Exercise parsing of an event's eventLabelId field."""
+
+    event = Event.model_validate(
+        {
+            "kind": "calendar#event",
+            "id": "some-event-id",
+            "status": "confirmed",
+            "summary": "Event summary",
+            "colorId": "11",
+            "eventLabelId": "custom-label-42",
+            "start": {"date": "2022-04-12"},
+            "end": {"date": "2022-04-13"},
+        }
+    )
+    # Both may be present at once; event_label_id supersedes color_id.
+    assert event.color_id == "11"
+    assert event.event_label_id == "custom-label-42"
+
+
+def test_calendar_basic_label_properties() -> None:
+    """Exercise parsing of a calendar's custom event color labels."""
+
+    calendar = CalendarBasic.model_validate(
+        {
+            "kind": "calendar#calendar",
+            "id": "some-calendar-id",
+            "summary": "Test Calendar",
+            "labelProperties": {
+                "eventLabels": [
+                    {
+                        "id": "custom-label-42",
+                        "backgroundColor": "#7986cb",
+                        "name": "Focus time",
+                    },
+                ]
+            },
+        }
+    )
+    assert calendar.label_properties == LabelProperties(
+        event_labels=[
+            EventLabel(
+                id="custom-label-42",
+                background_color="#7986cb",
+                name="Focus time",
+            )
+        ]
+    )
+
+
+def test_calendar_basic_no_label_properties() -> None:
+    """A calendar with no custom labels has label_properties=None."""
+
+    calendar = CalendarBasic.model_validate(
+        {
+            "kind": "calendar#calendar",
+            "id": "some-calendar-id",
+            "summary": "Test Calendar",
+        }
+    )
+    assert calendar.label_properties is None
 
 
 def test_event_fields_mask() -> None:
