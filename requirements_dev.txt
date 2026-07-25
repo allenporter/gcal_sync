@@ -16,4 +16,4 @@ ical==14.0.1
 pydantic==2.13.4
 pytest-aiohttp==1.1.1
 pytest-asyncio==1.4.0
-pytz==2026.2
+pytz==2026.3
