@@ -96,7 +96,7 @@ class FilteredIterable(Iterable[T]):
 
 
 def calendar_timeline(
-    events: list[Event], tzinfo: datetime.tzinfo = datetime.timezone.utc
+    events: list[Event], tzinfo: datetime.tzinfo = datetime.UTC
 ) -> Timeline:
     """Create a timeline for events on a calendar, including recurrence."""
     normal_events: list[Event] = []
@@ -112,9 +112,9 @@ def calendar_timeline(
                     event.original_start_time.value
                 )
             else:
-                recurring_skip[event.recurring_event_id] = set(
-                    [event.original_start_time.value]
-                )
+                recurring_skip[event.recurring_event_id] = {
+                    event.original_start_time.value
+                }
 
         if event.status == EventStatusEnum.CANCELLED:
             continue
@@ -123,7 +123,7 @@ def calendar_timeline(
         else:
             normal_events.append(event)
 
-    def sortable_items() -> Generator[SortableItem[Timespan, Event], None, None]:
+    def sortable_items() -> Generator[SortableItem[Timespan, Event]]:
         nonlocal normal_events
         for event in normal_events:
             if event.status == EventStatusEnum.CANCELLED:

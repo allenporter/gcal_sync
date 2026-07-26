@@ -24,7 +24,7 @@ import enum
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import Any, List, Optional, Self, TypeVar, Union, cast
+from typing import Any, Self, cast
 from urllib.request import pathname2url
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
@@ -33,8 +33,8 @@ from .auth import AbstractAuth
 from .const import ITEMS
 from .model import (
     EVENT_FIELDS,
-    CalendarBaseModel,
     Calendar,
+    CalendarBaseModel,
     CalendarBasic,
     Colors,
     Event,
@@ -45,19 +45,19 @@ from .store import CalendarStore
 from .timeline import Timeline, calendar_timeline
 
 __all__ = [
-    "GoogleCalendarService",
-    "CalendarListStoreService",
+    "Boolean",
     "CalendarEventStoreService",
     "CalendarListRequest",
     "CalendarListResponse",
+    "CalendarListStoreService",
+    "GoogleCalendarService",
     "ListEventsRequest",
-    "SyncEventsRequest",
     "ListEventsResponse",
     "LocalCalendarListResponse",
     "LocalListEventsRequest",
     "LocalListEventsResponse",
-    "Boolean",
     "Range",
+    "SyncEventsRequest",
 ]
 
 
@@ -80,20 +80,20 @@ INSTANCES_URL = "calendars/{calendar_id}/events/{event_id}/instances"
 class SyncableRequest(CalendarBaseModel):
     """Base class for a request that supports sync."""
 
-    page_token: Optional[str] = Field(default=None, alias="pageToken")
+    page_token: str | None = Field(default=None, alias="pageToken")
     """Token specifying which result page to return."""
 
-    sync_token: Optional[str] = Field(default=None, alias="syncToken")
+    sync_token: str | None = Field(default=None, alias="syncToken")
     """Token obtained from the last page of results of a previous request."""
 
 
 class SyncableResponse(CalendarBaseModel):
     """Base class for an API response that supports sync."""
 
-    page_token: Optional[str] = Field(default=None, alias="nextPageToken")
+    page_token: str | None = Field(default=None, alias="nextPageToken")
     """Token used to access the next page of this results."""
 
-    sync_token: Optional[str] = Field(default=None, alias="nextSyncToken")
+    sync_token: str | None = Field(default=None, alias="nextSyncToken")
     """Token used at a later point in time to retrieve entries changed."""
 
 
@@ -104,29 +104,27 @@ class CalendarListRequest(SyncableRequest):
 class CalendarListResponse(SyncableResponse):
     """Api response containing a list of calendars."""
 
-    items: List[Calendar] = []
+    items: list[Calendar] = Field(default_factory=list)
     """The calendars on the user's calendar list."""
 
 
 def now() -> datetime.datetime:
     """Helper method to facilitate mocking in tests."""
-    return datetime.datetime.now(datetime.timezone.utc)
+    return datetime.datetime.now(datetime.UTC)
 
 
-_RequestT = TypeVar(
-    "_RequestT",
-    bound="Union[ListEventsRequest, _RawListEventsRequest, LocalListEventsRequest]",
-)
-
-
-def _validate_datetime(self: _RequestT, key: str) -> _RequestT:
+def _validate_datetime[
+    RequestT: ListEventsRequest | _RawListEventsRequest | LocalListEventsRequest
+](self: RequestT, key: str) -> RequestT:
     """Validate date/datetime request fields are set properly."""
     if time := self.__dict__.get(key):
         self.__dict__[key] = time.replace(microsecond=0)
     return self
 
 
-def _validate_datetimes(self: _RequestT) -> _RequestT:
+def _validate_datetimes[
+    RequestT: ListEventsRequest | _RawListEventsRequest | LocalListEventsRequest
+](self: RequestT) -> RequestT:
     """Validate the date or datetime fields are set properly."""
     self = _validate_datetime(self, "start_time")
     self = _validate_datetime(self, "end_time")
@@ -139,15 +137,15 @@ class ListEventsRequest(SyncableRequest):
     calendar_id: str = Field(alias="calendarId")
     """Calendar identifier."""
 
-    start_time: Optional[datetime.datetime] = Field(
+    start_time: datetime.datetime | None = Field(
         default=None, alias="timeMin", validate_default=True
     )
     """Lower bound (exclusive) for an event's end time to filter by."""
 
-    end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
+    end_time: datetime.datetime | None = Field(default=None, alias="timeMax")
     """Upper bound (exclusive) for an event's start time to filter by."""
 
-    search: Optional[str] = Field(default=None, alias="q")
+    search: str | None = Field(default=None, alias="q")
     """Free text search terms to find events that match these terms
 
     This matches the summary, description, location, attendee's displayName,
@@ -230,14 +228,14 @@ class _RawListEventsRequest(CalendarBaseModel):
 
     calendar_id: str = Field(alias="calendarId")
     max_results: int = Field(default=EVENT_PAGE_SIZE, alias="maxResults")
-    single_events: Optional[Boolean] = Field(default=None, alias="singleEvents")
-    order_by: Optional[OrderBy] = Field(default=None, alias="orderBy")
+    single_events: Boolean | None = Field(default=None, alias="singleEvents")
+    order_by: OrderBy | None = Field(default=None, alias="orderBy")
     fields: str = Field(default=EVENT_API_FIELDS)
-    page_token: Optional[str] = Field(default=None, alias="pageToken")
-    sync_token: Optional[str] = Field(default=None, alias="syncToken")
-    start_time: Optional[datetime.datetime] = Field(default=None, alias="timeMin")
-    end_time: Optional[datetime.datetime] = Field(default=None, alias="timeMax")
-    search: Optional[str] = Field(default=None, alias="q")
+    page_token: str | None = Field(default=None, alias="pageToken")
+    sync_token: str | None = Field(default=None, alias="syncToken")
+    start_time: datetime.datetime | None = Field(default=None, alias="timeMin")
+    end_time: datetime.datetime | None = Field(default=None, alias="timeMax")
+    search: str | None = Field(default=None, alias="q")
 
     def as_dict(self) -> dict[str, Any]:
         """Return the object as a json dict."""
@@ -272,7 +270,7 @@ class _RawListEventsRequest(CalendarBaseModel):
 class _ListEventsResponseModel(SyncableResponse):
     """Api response containing a list of events."""
 
-    items: List[Event] = []
+    items: list[Event] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
@@ -462,7 +460,7 @@ class GoogleCalendarService:
 class LocalCalendarListResponse(CalendarBaseModel):
     """Api response containing a list of calendars."""
 
-    calendars: List[Calendar] = []
+    calendars: list[Calendar] = Field(default_factory=list)
     """The list of calendars."""
 
 
@@ -472,7 +470,7 @@ class LocalListEventsRequest(CalendarBaseModel):
     start_time: datetime.datetime = Field(default_factory=now)
     """Lower bound (exclusive) for an event's end time to filter by."""
 
-    end_time: Optional[datetime.datetime] = Field(default=None)
+    end_time: datetime.datetime | None = Field(default=None)
     """Upper bound (exclusive) for an event's start time to filter by."""
 
     @model_validator(mode="after")
@@ -486,7 +484,7 @@ class LocalListEventsRequest(CalendarBaseModel):
 class LocalListEventsResponse(CalendarBaseModel):
     """Api response containing a list of events."""
 
-    events: List[Event] = Field(default_factory=list)
+    events: list[Event] = Field(default_factory=list)
     """Events returned from the local store."""
 
 
@@ -568,7 +566,7 @@ class CalendarEventStoreService:
     ) -> Timeline:
         """Get the timeline of events."""
         if tzinfo is None:
-            tzinfo = datetime.timezone.utc
+            tzinfo = datetime.UTC
         events_data = await self._lookup_events_data()
         _LOGGER.debug("Created timeline of %d events", len(events_data))
 

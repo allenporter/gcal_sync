@@ -229,23 +229,23 @@ def test_active_after(timeline: Timeline) -> None:
     "at_datetime,expected_events",
     [
         (
-            datetime.datetime(2000, 1, 1, 11, 15, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2000, 1, 1, 11, 15, tzinfo=datetime.UTC),
             ["first"],
         ),
-        (datetime.datetime(2000, 1, 1, 11, 59, tzinfo=datetime.timezone.utc), []),
+        (datetime.datetime(2000, 1, 1, 11, 59, tzinfo=datetime.UTC), []),
         (
-            datetime.datetime(2000, 1, 1, 12, 0, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2000, 1, 1, 12, 0, tzinfo=datetime.UTC),
             ["second"],
         ),
         (
-            datetime.datetime(2000, 1, 1, 12, 30, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2000, 1, 1, 12, 30, tzinfo=datetime.UTC),
             ["second"],
         ),
         (
-            datetime.datetime(2000, 1, 1, 12, 59, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2000, 1, 1, 12, 59, tzinfo=datetime.UTC),
             ["second"],
         ),
-        (datetime.datetime(2000, 1, 1, 13, 0, tzinfo=datetime.timezone.utc), []),
+        (datetime.datetime(2000, 1, 1, 13, 0, tzinfo=datetime.UTC), []),
     ],
 )
 def test_at_instant(
@@ -380,18 +380,18 @@ def test_day_iteration(
     [
         (
             "America/Los_Angeles",  # UTC-8 in Feb
-            datetime.datetime(2000, 2, 1, 7, 59, 59, tzinfo=datetime.timezone.utc),
-            datetime.datetime(2000, 2, 1, 8, 0, 0, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2000, 2, 1, 7, 59, 59, tzinfo=datetime.UTC),
+            datetime.datetime(2000, 2, 1, 8, 0, 0, tzinfo=datetime.UTC),
         ),
         (
             "America/Regina",  # UTC-6 all year round
-            datetime.datetime(2000, 2, 1, 5, 59, 59, tzinfo=datetime.timezone.utc),
-            datetime.datetime(2000, 2, 1, 6, 0, 0, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2000, 2, 1, 5, 59, 59, tzinfo=datetime.UTC),
+            datetime.datetime(2000, 2, 1, 6, 0, 0, tzinfo=datetime.UTC),
         ),
         (
             "CET",  # UTC-1 in Feb
-            datetime.datetime(2000, 1, 31, 22, 59, 59, tzinfo=datetime.timezone.utc),
-            datetime.datetime(2000, 1, 31, 23, 0, 0, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2000, 1, 31, 22, 59, 59, tzinfo=datetime.UTC),
+            datetime.datetime(2000, 1, 31, 23, 0, 0, tzinfo=datetime.UTC),
         ),
     ],
 )
@@ -474,17 +474,17 @@ def test_recurrence_dst_tz_start_after() -> None:
     timeline = calendar_timeline([event])
 
     events = timeline.start_after(
-        datetime.datetime(2022, 11, 4, 10, 00, 0, tzinfo=datetime.timezone.utc),
+        datetime.datetime(2022, 11, 4, 10, 00, 0, tzinfo=datetime.UTC),
     )
     assert len(list(events)) == 2
 
     events = timeline.start_after(
-        datetime.datetime(2022, 11, 4, 11, 59, 0, tzinfo=datetime.timezone.utc),
+        datetime.datetime(2022, 11, 4, 11, 59, 0, tzinfo=datetime.UTC),
     )
     assert len(list(events)) == 2
 
     events = timeline.start_after(
-        datetime.datetime(2022, 11, 4, 12, 0, 0, tzinfo=datetime.timezone.utc),
+        datetime.datetime(2022, 11, 4, 12, 0, 0, tzinfo=datetime.UTC),
     )
     assert len(list(events)) == 1
 
@@ -676,8 +676,8 @@ async def test_all_day_iter_order(
         zoneinfo.ZoneInfo(time_zone),
     )
     events = timeline.overlapping(
-        datetime.datetime(2022, 10, 6, 0, 0, 0, tzinfo=datetime.timezone.utc),
-        datetime.datetime(2022, 10, 9, 0, 0, 0, tzinfo=datetime.timezone.utc),
+        datetime.datetime(2022, 10, 6, 0, 0, 0, tzinfo=datetime.UTC),
+        datetime.datetime(2022, 10, 9, 0, 0, 0, tzinfo=datetime.UTC),
     )
     assert [event.summary for event in events] == event_order
 
@@ -705,9 +705,7 @@ def test_recurrence_fields() -> None:
     assert event1.summary == "summary"
     sid = SyntheticEventId.parse(event1.id)
     assert sid.original_event_id == "event-id"
-    assert sid.dtstart == datetime.datetime(
-        2022, 8, 4, 16, 30, tzinfo=datetime.timezone.utc
-    )
+    assert sid.dtstart == datetime.datetime(2022, 8, 4, 16, 30, tzinfo=datetime.UTC)
     assert event1.start == DateOrDatetime.parse(
         datetime.datetime(
             2022, 8, 4, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
@@ -724,9 +722,7 @@ def test_recurrence_fields() -> None:
     assert event2.id
     sid = SyntheticEventId.parse(event2.id)
     assert sid.original_event_id == "event-id"
-    assert sid.dtstart == datetime.datetime(
-        2022, 8, 5, 16, 30, tzinfo=datetime.timezone.utc
-    )
+    assert sid.dtstart == datetime.datetime(2022, 8, 5, 16, 30, tzinfo=datetime.UTC)
     assert event2.start == DateOrDatetime.parse(
         datetime.datetime(
             2022, 8, 5, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
@@ -743,9 +739,7 @@ def test_recurrence_fields() -> None:
     assert event3.id
     sid = SyntheticEventId.parse(event3.id)
     assert sid.original_event_id == "event-id"
-    assert sid.dtstart == datetime.datetime(
-        2022, 8, 6, 16, 30, tzinfo=datetime.timezone.utc
-    )
+    assert sid.dtstart == datetime.datetime(2022, 8, 6, 16, 30, tzinfo=datetime.UTC)
     assert event3.start == DateOrDatetime.parse(
         datetime.datetime(
             2022, 8, 6, 9, 30, 0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")
