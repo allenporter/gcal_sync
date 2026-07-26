@@ -33,22 +33,22 @@ from pydantic import (
 
 from .exceptions import CalendarParseException
 
-__all__ = [
-    "AccessRole",
-    "Attendee",
+__all__ = [  # noqa: RUF022
     "Calendar",
+    "Event",
+    "DateOrDatetime",
+    "EventStatusEnum",
+    "EventTypeEnum",
+    "VisibilityEnum",
+    "ResponseStatus",
+    "Attendee",
+    "Reminders",
+    "ReminderOverride",
+    "ReminderMethod",
+    "AccessRole",
     "CalendarBasic",
     "ColorDefinition",
     "Colors",
-    "DateOrDatetime",
-    "Event",
-    "EventStatusEnum",
-    "EventTypeEnum",
-    "ReminderMethod",
-    "ReminderOverride",
-    "Reminders",
-    "ResponseStatus",
-    "VisibilityEnum",
 ]
 
 _LOGGER = logging.getLogger(__name__)

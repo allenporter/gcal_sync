@@ -44,20 +44,20 @@ from .model import (
 from .store import CalendarStore
 from .timeline import Timeline, calendar_timeline
 
-__all__ = [
-    "Boolean",
+__all__ = [  # noqa: RUF022
+    "GoogleCalendarService",
+    "CalendarListStoreService",
     "CalendarEventStoreService",
     "CalendarListRequest",
     "CalendarListResponse",
-    "CalendarListStoreService",
-    "GoogleCalendarService",
     "ListEventsRequest",
+    "SyncEventsRequest",
     "ListEventsResponse",
     "LocalCalendarListResponse",
     "LocalListEventsRequest",
     "LocalListEventsResponse",
+    "Boolean",
     "Range",
-    "SyncEventsRequest",
 ]
 
 
