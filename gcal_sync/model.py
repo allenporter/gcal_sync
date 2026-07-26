@@ -9,32 +9,31 @@ from __future__ import annotations
 
 import datetime
 import logging
-from functools import cache
 import zoneinfo
 from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Optional, Self, Union
+from functools import cache
+from typing import Any, Self
 
 from ical.component import ComponentModel
-from ical.recurrence import Recurrences
 from ical.exceptions import CalendarParseError
 from ical.iter import RulesetIterable
+from ical.recurrence import Recurrences
 from ical.timespan import Timespan
 from ical.types.data_types import serialize_field
 from ical.types.recur import Frequency, Recur
-
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    ValidationError,
     field_serializer,
     model_validator,
-    ValidationError,
 )
 
 from .exceptions import CalendarParseException
 
-__all__ = [
+__all__ = [  # noqa: RUF022
     "Calendar",
     "Event",
     "DateOrDatetime",
@@ -163,13 +162,13 @@ class Calendar(CalendarBaseModel):
     summary: str = ""
     """Title of the calendar."""
 
-    description: Optional[str] = None
+    description: str | None = None
     """Description of the calendar."""
 
-    location: Optional[str] = None
+    location: str | None = None
     """Geographic location of the calendar as free-form text."""
 
-    timezone: Optional[str] = Field(alias="timeZone", default=None)
+    timezone: str | None = Field(alias="timeZone", default=None)
     """The time zone of the calendar."""
 
     access_role: AccessRole = Field(alias="accessRole")
@@ -181,10 +180,10 @@ class Calendar(CalendarBaseModel):
     primary: bool = False
     """Whether the calendar is the primary calendar of the authenticated user."""
 
-    background_color: Optional[str] = Field(alias="backgroundColor", default=None)
+    background_color: str | None = Field(alias="backgroundColor", default=None)
     """The main color of the calendar in the hexadecimal format "#0088aa"."""
 
-    foreground_color: Optional[str] = Field(alias="foregroundColor", default=None)
+    foreground_color: str | None = Field(alias="foregroundColor", default=None)
     """The foreground color of the calendar in the hexadecimal format "#ffffff"."""
 
     model_config = ConfigDict(populate_by_name=True)
@@ -208,7 +207,7 @@ class Colors(CalendarBaseModel):
     or `event` respectively to resolve the hexadecimal color values.
     """
 
-    updated: Optional[datetime.datetime] = None
+    updated: datetime.datetime | None = None
     """Last modification time of the color palette, as a RFC3339 timestamp."""
 
     calendar: dict[str, ColorDefinition] = Field(default_factory=dict)
@@ -227,13 +226,13 @@ class CalendarBasic(CalendarBaseModel):
     summary: str = ""
     """Title of the calendar."""
 
-    description: Optional[str] = None
+    description: str | None = None
     """Description of the calendar."""
 
-    location: Optional[str] = None
+    location: str | None = None
     """Geographic location of the calendar as free-form text."""
 
-    timezone: Optional[str] = Field(alias="timeZone", default=None)
+    timezone: str | None = Field(alias="timeZone", default=None)
     """The time zone of the calendar."""
 
     model_config = ConfigDict(populate_by_name=True)
@@ -242,14 +241,14 @@ class CalendarBasic(CalendarBaseModel):
 class DateOrDatetime(CalendarBaseModel):
     """A date or datetime."""
 
-    date: Optional[datetime.date] = Field(default=None)
+    date: datetime.date | None = Field(default=None)
     """The date, in the format "yyyy-mm-dd", if this is an all-day event."""
 
-    date_time: Optional[datetime.datetime] = Field(alias="dateTime", default=None)
+    date_time: datetime.datetime | None = Field(alias="dateTime", default=None)
     """The time, as a combined date-time value."""
 
     # Note: timezone is only used for creating new events
-    timezone: Optional[str] = Field(alias="timeZone", default=None)
+    timezone: str | None = Field(alias="timeZone", default=None)
     """The time zone in which the time is specified."""
 
     @classmethod
@@ -260,7 +259,7 @@ class DateOrDatetime(CalendarBaseModel):
         return cls(date=value)
 
     @property
-    def value(self) -> Union[datetime.date, datetime.datetime]:
+    def value(self) -> datetime.date | datetime.datetime:
         """Return either a datetime or date representing the Datetime.
 
         This only replace tzinfo/offset in the datetime when the API response
@@ -291,7 +290,7 @@ class DateOrDatetime(CalendarBaseModel):
         if not isinstance(value, datetime.datetime):
             value = datetime.datetime.combine(value, MIDNIGHT)
         if value.tzinfo is None:
-            value = value.replace(tzinfo=(tzinfo if tzinfo else datetime.timezone.utc))
+            value = value.replace(tzinfo=(tzinfo if tzinfo else datetime.UTC))
         return value
 
     @model_validator(mode="after")
@@ -380,13 +379,13 @@ class ResponseStatus(str, Enum):
 class Attendee(CalendarBaseModel):
     """An attendee of an event."""
 
-    id: Optional[str] = None
+    id: str | None = None
     """The attendee's Profile ID, if available."""
 
     email: str = ""
     """The attendee's email address, if available."""
 
-    display_name: Optional[str] = Field(alias="displayName", default=None)
+    display_name: str | None = Field(alias="displayName", default=None)
     """The attendee's name, if available."""
 
     optional: bool = False
@@ -395,7 +394,7 @@ class Attendee(CalendarBaseModel):
     is_self: bool = False
     """Whether this entry represents the calendar on which this copy of the event appears."""
 
-    comment: Optional[str] = None
+    comment: str | None = None
     """The attendee's response comment."""
 
     organizer: bool = False
@@ -456,9 +455,13 @@ class SyntheticEventId:
 
             dtstart = datetime.datetime.strptime(
                 parts[1][:-1], "%Y%m%dT%H%M%S"
-            ).replace(tzinfo=datetime.timezone.utc)
+            ).replace(tzinfo=datetime.UTC)
         else:
-            dtstart = datetime.datetime.strptime(parts[1], "%Y%m%d").date()
+            dtstart = (
+                datetime.datetime.strptime(parts[1], "%Y%m%d")
+                .replace(tzinfo=datetime.UTC)
+                .date()
+            )
         return SyntheticEventId(parts[0], dtstart)
 
     @classmethod
@@ -474,7 +477,7 @@ class SyntheticEventId:
     def event_id(self) -> str:
         """Return the string value of the new event id."""
         if isinstance(self._dtstart, datetime.datetime):
-            utc = self._dtstart.astimezone(datetime.timezone.utc)
+            utc = self._dtstart.astimezone(datetime.UTC)
             return f"{self._event_id}{ID_DELIM}{utc.strftime('%Y%m%dT%H%M%SZ')}"
         return f"{self._event_id}{ID_DELIM}{self._dtstart.strftime('%Y%m%d')}"
 
@@ -492,7 +495,7 @@ class SyntheticEventId:
 class Recurrence(ComponentModel):
     """A pydantic model that captures the objects in a Google Calendar recurrence."""
 
-    rrule: list[Recur] = []
+    rrule: list[Recur] = Field(default_factory=list)
     """A recurrence rule specification.
 
     Defines a rule for specifying a repeated event. The recurrence set is the complete
@@ -507,7 +510,7 @@ class Recurrence(ComponentModel):
     make sure all instances have the same start time regardless of time zone changing.
     """
 
-    rdate: list[Union[datetime.datetime, datetime.date]] = Field(default_factory=list)
+    rdate: list[datetime.datetime | datetime.date] = Field(default_factory=list)
     """Defines the list of date/time values for recurring events.
 
     Can appear along with the rrule property to define a set of repeating
@@ -517,7 +520,7 @@ class Recurrence(ComponentModel):
     any times specified by exdate.
     """
 
-    exdate: list[Union[datetime.datetime, datetime.date]] = Field(default_factory=list)
+    exdate: list[datetime.datetime | datetime.date] = Field(default_factory=list)
     """Defines the list of exceptions for recurring events.
 
     The exception dates are used in computing the recurrence set. The recurrence set is
@@ -527,7 +530,7 @@ class Recurrence(ComponentModel):
     """
 
     @classmethod
-    def from_recurrence(cls, recurrence: list[str]) -> "Recurrence":
+    def from_recurrence(cls, recurrence: list[str]) -> Recurrence:
         """Parse a Recurrence object form calendar API list of recurrence rules."""
         try:
             recurrences = Recurrences.from_basic_contentlines(recurrence)
@@ -607,10 +610,10 @@ class Reminders(CalendarBaseModel):
 class Event(CalendarBaseModel):
     """A single event on a calendar."""
 
-    id: Optional[str] = None
+    id: str | None = None
     """Opaque identifier of the event."""
 
-    ical_uuid: Optional[str] = Field(alias="iCalUID", default=None)
+    ical_uuid: str | None = Field(alias="iCalUID", default=None)
     """Event unique identifier as defined in RFC5545.
 
     Note that the iCalUID and the id are not identical. One difference in
@@ -627,13 +630,13 @@ class Event(CalendarBaseModel):
     end: DateOrDatetime
     """The (exclusive) end time of the event."""
 
-    description: Optional[str] = None
+    description: str | None = None
     """Description of the event, which can contain HTML."""
 
-    location: Optional[str] = None
+    location: str | None = None
     """Geographic location of the event as free-form text."""
 
-    color_id: Optional[str] = Field(alias="colorId", default=None)
+    color_id: str | None = Field(alias="colorId", default=None)
     """The color of the event.
 
     This is an id referring to an entry in the `event` section of the response
@@ -676,19 +679,19 @@ class Event(CalendarBaseModel):
 
     See RFC5545 for more details."""
 
-    recur: Optional[Recurrence] = Field(default=None, exclude=True)
+    recur: Recurrence | None = Field(default=None, exclude=True)
 
-    recurring_event_id: Optional[str] = Field(alias="recurringEventId", default=None)
+    recurring_event_id: str | None = Field(alias="recurringEventId", default=None)
     """The id of the primary even to which this recurring event belongs."""
 
-    original_start_time: Optional[DateOrDatetime] = Field(
+    original_start_time: DateOrDatetime | None = Field(
         alias="originalStartTime", default=None
     )
     """A unique identifier event start in the original recurring event."""
 
-    reminders: Optional[Reminders] = None
+    reminders: Reminders | None = None
 
-    private_calendar_id: Optional[str] = Field(default=None, exclude=True)
+    private_calendar_id: str | None = Field(default=None, exclude=True)
     """The calendar id of the calendar this event belongs to.
 
     This attribute is used internally and not part of the event API.
@@ -700,7 +703,7 @@ class Event(CalendarBaseModel):
         return self.end.value - self.start.value
 
     @property
-    def rrule(self) -> Iterable[Union[datetime.date, datetime.datetime]]:
+    def rrule(self) -> Iterable[datetime.date | datetime.datetime]:
         """Return the recurrence rules as a set of rules."""
         if len(self.recurrence) == 0 or not self.recur:
             return []
@@ -710,21 +713,19 @@ class Event(CalendarBaseModel):
     @classmethod
     def _allow_cancelled_events(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Special case for canceled event tombstones missing required fields."""
-        if status := values.get("status"):
-            if status == EventStatusEnum.CANCELLED:
-                if "start" not in values:
-                    values["start"] = DateOrDatetime(date=datetime.date.min)
-                if "end" not in values:
-                    values["end"] = DateOrDatetime(date=datetime.date.min)
+        if values.get("status") == EventStatusEnum.CANCELLED:
+            if "start" not in values:
+                values["start"] = DateOrDatetime(date=datetime.date.min)
+            if "end" not in values:
+                values["end"] = DateOrDatetime(date=datetime.date.min)
         return values
 
     @model_validator(mode="before")
     @classmethod
     def _adjust_visibility(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Convert legacy visibility types to new types."""
-        if visibility := values.get("visibility"):
-            if visibility == "confidential":
-                values["visibility"] = "private"
+        if values.get("visibility") == "confidential":
+            values["visibility"] = "private"
         return values
 
     @model_validator(mode="before")
@@ -828,10 +829,11 @@ class Event(CalendarBaseModel):
     @classmethod
     def _adjust_unknown_event_type(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Validate the event type."""
-        if event_type := values.get("eventType"):
-            if event_type not in [member.value for member in EventTypeEnum]:
-                _LOGGER.debug("Unknown event type: %s", event_type)
-                values["eventType"] = EventTypeEnum.UNKNOWN
+        if (event_type := values.get("eventType")) and event_type not in [
+            member.value for member in EventTypeEnum
+        ]:
+            _LOGGER.debug("Unknown event type: %s", event_type)
+            values["eventType"] = EventTypeEnum.UNKNOWN
         return values
 
     @model_validator(mode="after")
@@ -855,22 +857,22 @@ class Event(CalendarBaseModel):
     @property
     def timespan(self) -> Timespan:
         """Return a timespan representing the event start and end."""
-        return self.timespan_of(datetime.timezone.utc)
+        return self.timespan_of(datetime.UTC)
 
     def timespan_of(self, tzinfo: datetime.tzinfo | None = None) -> Timespan:
         """Return a timespan representing the event start and end."""
         if tzinfo is None:
-            tzinfo = datetime.timezone.utc
+            tzinfo = datetime.UTC
         return Timespan.of(
             self.start.normalize(tzinfo),
             self.end.normalize(tzinfo),
         )
 
-    def intersects(self, other: "Event") -> bool:
+    def intersects(self, other: Event) -> bool:
         """Return True if this event overlaps with the other event."""
         return self.timespan.intersects(other.timespan)
 
-    def includes(self, other: "Event") -> bool:
+    def includes(self, other: Event) -> bool:
         """Return True if the other event starts and ends within this event."""
         return self.timespan.includes(other.timespan)
 

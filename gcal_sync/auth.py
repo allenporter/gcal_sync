@@ -31,7 +31,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from http import HTTPStatus
-from typing import Any, List
+from typing import Any
 
 import aiohttp
 from aiohttp.client_exceptions import ClientError, ClientResponseError
@@ -79,7 +79,7 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
         except ClientError as err:
             raise AuthException(f"Access token failure: {err}") from err
         headers = {AUTHORIZATION_HEADER: f"Bearer {access_token}"}
-        if not (url.startswith("http://") or url.startswith("https://")):
+        if not url.startswith(("http://", "https://")):
             url = f"{self._host}/{url}"
         _LOGGER.debug("request[%s]=%s %s", method, url, kwargs.get("params"))
         if method != "get" and "json" in kwargs:
@@ -150,7 +150,7 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
         return resp
 
     @staticmethod
-    async def _error_detail(resp: aiohttp.ClientResponse) -> List[str]:
+    async def _error_detail(resp: aiohttp.ClientResponse) -> list[str]:
         """Returns an error message string from the APi response."""
         if resp.status < 400:
             return []

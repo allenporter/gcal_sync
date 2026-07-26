@@ -341,8 +341,7 @@ async def test_event_sync_date_pages(
     await sync.run()
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}",
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&pageToken=page-token-1",
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}&pageToken=page-token-1",
     ]
     request_reset()
 
@@ -366,8 +365,7 @@ async def test_event_sync_date_pages(
     )
     await sync.run()
     assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}"
-        "&syncToken=sync-token-1",
+        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}&syncToken=sync-token-1",
     ]
 
 
@@ -424,8 +422,7 @@ async def test_event_sync_datetime_pages(
     await sync.run()
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}",
-        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}"
-        f"&pageToken=page-token-1",
+        f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}&pageToken=page-token-1",
     ]
     request_reset()
 
@@ -449,8 +446,7 @@ async def test_event_sync_datetime_pages(
     )
     await sync.run()
     assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}"
-        "&syncToken=sync-token-1",
+        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}&syncToken=sync-token-1",
     ]
 
 
@@ -538,8 +534,7 @@ async def test_event_invalidated_sync_token(
     )
     await sync.run()
     assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}"
-        "&syncToken=sync-token-1",
+        f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}&syncToken=sync-token-1",
         f"/calendars/some-calendar-id/events?{EVENT_LIST_PARAMS}",
     ]
     result = await sync.store_service.async_list_events(LocalListEventsRequest())

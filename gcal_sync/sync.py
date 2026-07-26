@@ -16,7 +16,7 @@ import datetime
 import json
 import logging
 from collections.abc import Awaitable, Callable
-from typing import Any, TypeVar
+from typing import Any
 
 from .api import (
     CalendarEventStoreService,
@@ -39,10 +39,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # Can be incremented to blow away existing store
 VERSION = 2
-MIN_SYNC_DATETIME = datetime.datetime(2006, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
-
-T = TypeVar("T", bound=SyncableRequest)
-S = TypeVar("S", bound=SyncableResponse)
+MIN_SYNC_DATETIME = datetime.datetime(2006, 1, 1, 0, 0, 0, tzinfo=datetime.UTC)
 
 
 def _items_func(
@@ -56,7 +53,7 @@ def _items_func(
     return items
 
 
-async def _run_sync(
+async def _run_sync[T: SyncableRequest, S: SyncableResponse](
     store_data: dict[str, Any],
     new_request: Callable[[str | None], T],
     api_call: Callable[[T], Awaitable[S]],
@@ -203,7 +200,7 @@ class CalendarEventSyncManager:
             return self._request_template.model_validate(
                 {
                     **self._request_template.model_dump(include={"calendar_id"}),
-                    **{"sync_token": sync_token},
+                    "sync_token": sync_token,
                 }
             )
 

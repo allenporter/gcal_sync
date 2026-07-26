@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import datetime
 import json
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Generator
 from json import JSONDecodeError
-from typing import Any, Generator, List, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import aiohttp
 import pytest
@@ -24,7 +24,7 @@ ResponseResult = Callable[[aiohttp.web.Response], None]
 ApiResult = Callable[[dict[str, Any]], None]
 ApiRequest = Callable[[], list[dict[str, Any]]]
 _T = TypeVar("_T")
-YieldFixture = Generator[_T, None, None]
+YieldFixture = Generator[_T]
 NestTestClient = TestClient[aiohttp.web.Request, aiohttp.web.Application]
 
 
@@ -190,7 +190,7 @@ def mock_url_request(app: aiohttp.web.Application) -> Callable[[], list[str]]:
     """Fixture to return the requested url."""
 
     def _get_request() -> list[str]:
-        return cast(List[str], app["request"])
+        return cast(list[str], app["request"])
 
     return _get_request
 
@@ -200,7 +200,7 @@ def mock_json_request(app: aiohttp.web.Application) -> ApiRequest:
     """Fixture to return the received request."""
 
     def _get_request() -> list[dict[str, Any]]:
-        return cast(List[dict[str, Any]], app["request-json"])
+        return cast(list[dict[str, Any]], app["request-json"])
 
     return _get_request
 
@@ -210,7 +210,7 @@ def mock_post_body(app: aiohttp.web.Application) -> Callable[[], list[str]]:
     """Fixture to return the received post body."""
 
     def _get_request() -> list[str]:
-        return cast(List[str], app["request-post"])
+        return cast(list[str], app["request-post"])
 
     return _get_request
 
