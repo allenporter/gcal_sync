@@ -33,7 +33,7 @@ from pydantic import (
 
 from .exceptions import CalendarParseException
 
-__all__ = [  # noqa: RUF022
+__all__ = [
     "Calendar",
     "Event",
     "DateOrDatetime",

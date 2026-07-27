@@ -44,7 +44,7 @@ from .model import (
 from .store import CalendarStore
 from .timeline import Timeline, calendar_timeline
 
-__all__ = [  # noqa: RUF022
+__all__ = [
     "GoogleCalendarService",
     "CalendarListStoreService",
     "CalendarEventStoreService",
