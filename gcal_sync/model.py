@@ -100,10 +100,20 @@ class AccessRole(str, Enum):
     OWNER = "owner"
     """Provides ownership of the calendar."""
 
+    WRITER_WITHOUT_PRIVATE_ACCESS = "writerWithoutPrivateAccess"
+    """Provides read and write access to the calendar without private event details."""
+
+    UNKNOWN = "unknown"
+    """An unknown access role."""
+
     @property
     def is_writer(self) -> bool:
         """Return if this role can create, delete, update events."""
-        return self in (AccessRole.WRITER, AccessRole.OWNER)
+        return self in (
+            AccessRole.WRITER,
+            AccessRole.OWNER,
+            AccessRole.WRITER_WITHOUT_PRIVATE_ACCESS,
+        )
 
 
 def _raise_parse_exception(
@@ -187,6 +197,20 @@ class Calendar(CalendarBaseModel):
     """The foreground color of the calendar in the hexadecimal format "#ffffff"."""
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _adjust_unknown_access_role(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Validate the access role."""
+        key = "accessRole" if "accessRole" in values else "access_role"
+        if (
+            (access_role := values.get(key))
+            and isinstance(access_role, str)
+            and access_role not in [member.value for member in AccessRole]
+        ):
+            _LOGGER.debug("Unknown access role: %s", access_role)
+            values[key] = AccessRole.UNKNOWN
+        return values
 
 
 class ColorDefinition(CalendarBaseModel):

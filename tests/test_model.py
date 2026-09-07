@@ -86,6 +86,39 @@ def test_calendar_timezone() -> None:
     assert calendar.foreground_color is None
 
 
+@pytest.mark.parametrize(
+    "api_access_role,access_role",
+    [
+        ("freeBusyReader", AccessRole.FREE_BUSY_READER),
+        ("reader", AccessRole.READER),
+        ("writer", AccessRole.WRITER),
+        ("owner", AccessRole.OWNER),
+        ("writerWithoutPrivateAccess", AccessRole.WRITER_WITHOUT_PRIVATE_ACCESS),
+        ("some-unknown-role", AccessRole.UNKNOWN),
+    ],
+)
+def test_calendar_access_role(api_access_role: str, access_role: AccessRole) -> None:
+    """Test parsing access roles in a calendar."""
+    calendar = Calendar.model_validate(
+        {
+            "id": "some-calendar-id",
+            "summary": "Calendar summary",
+            "accessRole": api_access_role,
+        }
+    )
+    assert calendar.access_role == access_role
+
+
+def test_calendar_unknown_access_role_by_alias() -> None:
+    """Test instantiating calendar with unknown access role using attribute name."""
+    calendar = Calendar(
+        id="some-calendar-id",
+        summary="Calendar summary",
+        access_role="unknown-role",  # type: ignore[arg-type]
+    )
+    assert calendar.access_role == AccessRole.UNKNOWN
+
+
 def test_event_with_date() -> None:
     """Exercise basic parsing of an event API response."""
 
@@ -950,6 +983,8 @@ def test_invalid_event_id(event_id: str) -> None:
         (AccessRole.READER, False),
         (AccessRole.WRITER, True),
         (AccessRole.OWNER, True),
+        (AccessRole.WRITER_WITHOUT_PRIVATE_ACCESS, True),
+        (AccessRole.UNKNOWN, False),
     ],
 )
 def test_access_role_writer(access_role: AccessRole, writer: bool) -> None:
