@@ -110,6 +110,16 @@ async def test_list_calendars(
                     "summary": "Calendar 2",
                     "accessRole": "owner",
                 },
+                {
+                    "id": "calendar-id-3",
+                    "summary": "Calendar 3",
+                    "accessRole": "writerWithoutPrivateAccess",
+                },
+                {
+                    "id": "calendar-id-4",
+                    "summary": "Calendar 4",
+                    "accessRole": "unexpectedRole",
+                },
             ]
         }
     )
@@ -121,6 +131,16 @@ async def test_list_calendars(
         ),
         Calendar(
             id="calendar-id-2", summary="Calendar 2", access_role=AccessRole.OWNER
+        ),
+        Calendar(
+            id="calendar-id-3",
+            summary="Calendar 3",
+            access_role=AccessRole.WRITER_WITHOUT_PRIVATE_ACCESS,
+        ),
+        Calendar(
+            id="calendar-id-4",
+            summary="Calendar 4",
+            access_role=AccessRole.UNKNOWN,
         ),
     ]
 
