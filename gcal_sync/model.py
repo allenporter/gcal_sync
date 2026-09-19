@@ -257,7 +257,7 @@ class EventLabel(CalendarBaseModel):
     background_color: str = Field(alias="backgroundColor")
     """The background color for this label, in the hexadecimal format "#0088aa"."""
 
-    name: Optional[str] = None
+    name: str | None = None
     """A human readable name for this label, e.g. "Work" or "Personal"."""
 
     model_config = ConfigDict(populate_by_name=True)
@@ -290,7 +290,7 @@ class CalendarBasic(CalendarBaseModel):
     timezone: str | None = Field(alias="timeZone", default=None)
     """The time zone of the calendar."""
 
-    label_properties: Optional[LabelProperties] = Field(
+    label_properties: LabelProperties | None = Field(
         alias="labelProperties", default=None
     )
     """The calendar's custom event color labels, if any are defined.
@@ -711,7 +711,7 @@ class Event(CalendarBaseModel):
     This is superseded by `event_label_id` when present; see `event_label_id`.
     """
 
-    event_label_id: Optional[str] = Field(alias="eventLabelId", default=None)
+    event_label_id: str | None = Field(alias="eventLabelId", default=None)
     """The custom color label assigned to the event, if any.
 
     Supersedes `color_id`. This is an id referring to an entry in the calendar's
