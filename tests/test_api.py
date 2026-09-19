@@ -21,6 +21,8 @@ from gcal_sync.model import (
     Colors,
     DateOrDatetime,
     Event,
+    EventLabel,
+    LabelProperties,
     ReminderMethod,
     ReminderOverride,
     Reminders,
@@ -56,6 +58,47 @@ async def test_get_calendar(
     assert result == CalendarBasic(
         id="calendar-id-1",
         summary="Calendar 1",
+    )
+
+    assert url_request() == ["/calendars/primary"]
+
+
+async def test_get_calendar_with_label_properties(
+    calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test that async_get_calendar surfaces custom event color labels."""
+
+    json_response(
+        {
+            "id": "calendar-id-1",
+            "summary": "Calendar 1",
+            "labelProperties": {
+                "eventLabels": [
+                    {
+                        "id": "custom-label-42",
+                        "backgroundColor": "#7986cb",
+                        "name": "Focus time",
+                    },
+                ]
+            },
+        },
+    )
+    calendar_service = await calendar_service_cb()
+    result = await calendar_service.async_get_calendar("primary")
+    assert result == CalendarBasic(
+        id="calendar-id-1",
+        summary="Calendar 1",
+        label_properties=LabelProperties(
+            event_labels=[
+                EventLabel(
+                    id="custom-label-42",
+                    background_color="#7986cb",
+                    name="Focus time",
+                )
+            ]
+        ),
     )
 
     assert url_request() == ["/calendars/primary"]
