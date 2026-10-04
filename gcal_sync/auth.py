@@ -86,13 +86,19 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
             _LOGGER.debug("request[post json]=%s", kwargs["json"])
         return await self._websession.request(method, url, **kwargs, headers=headers)
 
-    async def get(self, url: str, **kwargs: Any) -> aiohttp.ClientResponse:
-        """Make a get request."""
+    async def _checked_request(
+        self, method: str, url: str, **kwargs: Any
+    ) -> aiohttp.ClientResponse:
+        """Make a request and raise an ApiException on failure."""
         try:
-            resp = await self.request("get", url, **kwargs)
+            resp = await self.request(method, url, **kwargs)
         except ClientError as err:
             raise ApiException(f"Error connecting to API: {err}") from err
         return await AbstractAuth._raise_for_status(resp)
+
+    async def get(self, url: str, **kwargs: Any) -> aiohttp.ClientResponse:
+        """Make a get request."""
+        return await self._checked_request("get", url, **kwargs)
 
     async def get_json(self, url: str, **kwargs: Any) -> dict[str, Any]:
         """Make a get request and return json response."""
@@ -108,11 +114,7 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
 
     async def post(self, url: str, **kwargs: Any) -> aiohttp.ClientResponse:
         """Make a post request."""
-        try:
-            resp = await self.request("post", url, **kwargs)
-        except ClientError as err:
-            raise ApiException(f"Error connecting to API: {err}") from err
-        return await AbstractAuth._raise_for_status(resp)
+        return await self._checked_request("post", url, **kwargs)
 
     async def post_json(self, url: str, **kwargs: Any) -> dict[str, Any]:
         """Make a post request and return a json response."""
@@ -125,6 +127,14 @@ class AbstractAuth(ABC):  # pylint: disable=too-few-public-methods
             raise ApiException(f"Server returned malformed response: {result}")
         _LOGGER.debug("response=%s", result)
         return result
+
+    async def patch(self, url: str, **kwargs: Any) -> aiohttp.ClientResponse:
+        """Make a patch request."""
+        return await self._checked_request("patch", url, **kwargs)
+
+    async def delete(self, url: str, **kwargs: Any) -> aiohttp.ClientResponse:
+        """Make a delete request."""
+        return await self._checked_request("delete", url, **kwargs)
 
     @staticmethod
     async def _raise_for_status(resp: aiohttp.ClientResponse) -> aiohttp.ClientResponse:
