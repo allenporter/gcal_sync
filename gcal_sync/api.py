@@ -435,8 +435,7 @@ class GoogleCalendarService:
         body: dict[str, Any],
     ) -> None:
         """Updates an event using patch semantics, with raw API data."""
-        await self._auth.request(
-            "patch",
+        await self._auth.patch(
             CALENDAR_EVENT_ID_URL.format(
                 calendar_id=pathname2url(calendar_id), event_id=pathname2url(event_id)
             ),
@@ -449,8 +448,7 @@ class GoogleCalendarService:
         event_id: str,
     ) -> None:
         """Delete an event on the specified calendar."""
-        await self._auth.request(
-            "delete",
+        await self._auth.delete(
             CALENDAR_EVENT_ID_URL.format(
                 calendar_id=pathname2url(calendar_id), event_id=pathname2url(event_id)
             ),
