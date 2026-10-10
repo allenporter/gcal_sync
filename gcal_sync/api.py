@@ -687,9 +687,17 @@ class CalendarEventStoreService:
         return store_data.get(ITEMS, {})  # type: ignore[no-any-return]
 
     async def _lookup_ical_uuid(self, ical_uuid: str) -> Event | None:
-        """Find the specified event by id in the local store."""
+        """Find the specified event by id in the local store.
+
+        Modified instances of a recurring event share the iCalUID of the recurring
+        event, so the recurring event is preferred over its modified instances.
+        """
         events_data = await self._lookup_events_data()
+        instance_data: dict[str, Any] | None = None
         for data in events_data.values():
             if (event_uuid := data.get("ical_uuid")) and event_uuid == ical_uuid:
-                return Event(**data)
-        return None
+                if not data.get("recurring_event_id"):
+                    return Event(**data)
+                if instance_data is None:
+                    instance_data = data
+        return Event(**instance_data) if instance_data is not None else None
