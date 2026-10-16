@@ -1,6 +1,7 @@
 """Tests for the request client library."""
 
 from collections.abc import Awaitable, Callable
+from unittest.mock import patch
 
 import aiohttp
 import pytest
@@ -237,3 +238,57 @@ async def test_forbidden_error(
     auth = await auth_client("/path-prefix")
     with pytest.raises(ApiForbiddenException):
         await auth.get_json("some-path")
+
+
+NOT_FOUND_RESPONSE = {
+    "error": {
+        "errors": [
+            {
+                "domain": "global",
+                "reason": "notFound",
+                "message": "Not Found",
+            }
+        ],
+        "code": 404,
+        "message": "Not Found",
+    }
+}
+
+
+async def test_patch_delete_error_response(
+    app: aiohttp.web.Application, auth_client: Callable[[str], Awaitable[AbstractAuth]]
+) -> None:
+    """Test patch and delete requests raise on an error response."""
+
+    async def handler(_: aiohttp.web.Request) -> aiohttp.web.Response:
+        return aiohttp.web.json_response(NOT_FOUND_RESPONSE, status=404)
+
+    app.router.add_patch("/path-prefix/some-path", handler)
+    app.router.add_delete("/path-prefix/some-path", handler)
+
+    auth = await auth_client("/path-prefix")
+
+    with pytest.raises(ApiException, match=r"Error from API: 404: Not Found"):
+        await auth.patch("some-path", json={})
+
+    with pytest.raises(ApiException, match=r"Error from API: 404: Not Found"):
+        await auth.delete("some-path")
+
+
+async def test_patch_delete_connection_error(
+    auth_client: Callable[[str], Awaitable[AbstractAuth]],
+) -> None:
+    """Test patch and delete requests raise on a connection error."""
+    auth = await auth_client("/path-prefix")
+
+    with (
+        patch.object(auth, "request", side_effect=aiohttp.ClientError()),
+        pytest.raises(ApiException, match="Error connecting to API"),
+    ):
+        await auth.patch("some-path", json={})
+
+    with (
+        patch.object(auth, "request", side_effect=aiohttp.ClientError()),
+        pytest.raises(ApiException, match="Error connecting to API"),
+    ):
+        await auth.delete("some-path")
