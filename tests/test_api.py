@@ -1054,6 +1054,113 @@ async def test_delete_missing_event(
         )
 
 
+async def test_delete_recurring_event_and_future_with_modified_instance(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+    json_request: Callable[[], str],
+) -> None:
+    """Test deleting future instances resolves the recurring event, not a modified instance."""
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1_20220420",
+                    "iCalUID": "some-event-id-1@google.com",
+                    "summary": "Modified instance",
+                    "start": {
+                        "date": "2022-04-21",
+                    },
+                    "end": {
+                        "date": "2022-04-22",
+                    },
+                    "recurringEventId": "some-event-id-1",
+                    "originalStartTime": {
+                        "date": "2022-04-20",
+                    },
+                    "status": "confirmed",
+                },
+                {
+                    "id": "some-event-id-1",
+                    "iCalUID": "some-event-id-1@google.com",
+                    "summary": "Event 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                    "recurrence": [
+                        "RRULE:FREQ=WEEKLY;COUNT=5",
+                    ],
+                },
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+    json_response({})
+    sync = await event_sync_manager_cb()
+    await sync.run()
+    await sync.store_service.async_delete_event(
+        ical_uuid="some-event-id-1@google.com",
+        event_id="some-event-id-1_20220420",
+        recurrence_range=Range.THIS_AND_FUTURE,
+    )
+    assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
+        "/calendars/some-calendar-id/events/some-event-id-1",
+    ]
+    assert json_request() == [
+        {
+            "id": "some-event-id-1",
+            "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20220419"],
+        }
+    ]
+
+
+async def test_delete_modified_instance_without_recurring_event(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+    url_request: Callable[[], str],
+) -> None:
+    """Test a modified instance is still found when its recurring event is not stored."""
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1_20220420",
+                    "iCalUID": "some-event-id-1@google.com",
+                    "summary": "Modified instance",
+                    "start": {
+                        "date": "2022-04-21",
+                    },
+                    "end": {
+                        "date": "2022-04-22",
+                    },
+                    "recurringEventId": "some-event-id-1",
+                    "originalStartTime": {
+                        "date": "2022-04-20",
+                    },
+                    "status": "confirmed",
+                },
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+    json_response({})
+    sync = await event_sync_manager_cb()
+    await sync.run()
+    await sync.store_service.async_delete_event(
+        ical_uuid="some-event-id-1@google.com",
+        event_id="some-event-id-1_20220420",
+    )
+    assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
+        "/calendars/some-calendar-id/events/some-event-id-1_20220420",
+    ]
+
+
 async def test_create_event_with_reminder(
     calendar_service_cb: Callable[[], Awaitable[GoogleCalendarService]],
     json_request: ApiRequest,
