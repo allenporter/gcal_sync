@@ -1,7 +1,6 @@
 """Tests for the request client library."""
 
 from collections.abc import Awaitable, Callable
-from unittest.mock import patch
 
 import aiohttp
 import pytest
@@ -276,19 +275,22 @@ async def test_patch_delete_error_response(
 
 
 async def test_patch_delete_connection_error(
-    auth_client: Callable[[str], Awaitable[AbstractAuth]],
+    app: aiohttp.web.Application, auth_client: Callable[[str], Awaitable[AbstractAuth]]
 ) -> None:
     """Test patch and delete requests raise on a connection error."""
+
+    async def handler(request: aiohttp.web.Request) -> aiohttp.web.Response:
+        assert request.transport
+        request.transport.close()
+        return aiohttp.web.Response()
+
+    app.router.add_patch("/path-prefix/some-path", handler)
+    app.router.add_delete("/path-prefix/some-path", handler)
+
     auth = await auth_client("/path-prefix")
 
-    with (
-        patch.object(auth, "request", side_effect=aiohttp.ClientError()),
-        pytest.raises(ApiException, match="Error connecting to API"),
-    ):
+    with pytest.raises(ApiException, match="Error connecting to API"):
         await auth.patch("some-path", json={})
 
-    with (
-        patch.object(auth, "request", side_effect=aiohttp.ClientError()),
-        pytest.raises(ApiException, match="Error connecting to API"),
-    ):
+    with pytest.raises(ApiException, match="Error connecting to API"):
         await auth.delete("some-path")
