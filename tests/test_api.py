@@ -3,6 +3,7 @@
 import datetime
 from collections.abc import Awaitable, Callable
 
+import aiohttp
 import pytest
 from freezegun import freeze_time
 
@@ -12,6 +13,7 @@ from gcal_sync.api import (
     LocalListEventsRequest,
     Range,
 )
+from gcal_sync.exceptions import ApiException
 from gcal_sync.model import (
     EVENT_FIELDS,
     AccessRole,
@@ -29,7 +31,7 @@ from gcal_sync.model import (
 )
 from gcal_sync.sync import CalendarEventSyncManager
 
-from .conftest import ApiRequest, ApiResult
+from .conftest import ApiRequest, ApiResult, ResponseResult
 
 EVENT_LIST_PARAMS = (
     "maxResults=1000&singleEvents=true&orderBy=startTime"
@@ -777,6 +779,68 @@ async def test_delete_event(
         "/calendars/some-calendar-id/events/some-event-id-1",
     ]
     assert json_request() == []
+
+
+@pytest.mark.parametrize(
+    ("recurrence", "event_id"),
+    [
+        ([], None),  # DELETE request
+        (["RRULE:FREQ=WEEKLY;COUNT=5"], "some-event-id-1_20220420"),  # PATCH request
+    ],
+)
+async def test_delete_event_error_response(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+    response: ResponseResult,
+    recurrence: list[str],
+    event_id: str | None,
+) -> None:
+    """Test deleting an event raises when the API rejects the request."""
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "some-event-id-1",
+                    "iCalUID": "some-event-id-1@google.com",
+                    "summary": "Event 1",
+                    "start": {
+                        "date": "2022-04-13",
+                    },
+                    "end": {
+                        "date": "2022-04-14",
+                    },
+                    "status": "confirmed",
+                    "recurrence": recurrence,
+                }
+            ],
+            "nextSyncToken": "sync-token-1",
+        }
+    )
+    response(
+        aiohttp.web.json_response(
+            {
+                "error": {
+                    "errors": [
+                        {
+                            "domain": "global",
+                            "reason": "notFound",
+                            "message": "Not Found",
+                        }
+                    ],
+                    "code": 404,
+                    "message": "Not Found",
+                }
+            },
+            status=404,
+        )
+    )
+    sync = await event_sync_manager_cb()
+    await sync.run()
+    with pytest.raises(ApiException, match=r"Error from API: 404: Not Found"):
+        await sync.store_service.async_delete_event(
+            ical_uuid="some-event-id-1@google.com",
+            event_id=event_id,
+        )
 
 
 async def test_delete_recurring_event_instance(
