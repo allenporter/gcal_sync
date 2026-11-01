@@ -1189,6 +1189,76 @@ CANCELLED_INSTANCE = {
     },
     "status": "cancelled",
 }
+TIMED_RECURRING_EVENT = {
+    "id": "some-event-id-4",
+    "iCalUID": "some-event-id-4@google.com",
+    "summary": "Event 4",
+    "start": {
+        "dateTime": "2022-04-13T09:00:00-06:00",
+        "timeZone": "America/Regina",
+    },
+    "end": {
+        "dateTime": "2022-04-13T10:00:00-06:00",
+        "timeZone": "America/Regina",
+    },
+    "status": "confirmed",
+    "recurrence": [
+        "RRULE:FREQ=WEEKLY;COUNT=5",
+    ],
+}
+# Modified instance of TIMED_RECURRING_EVENT moved by an hour
+TIMED_MODIFIED_INSTANCE = {
+    "id": "some-event-id-4_20220420T150000Z",
+    "iCalUID": "some-event-id-4@google.com",
+    "summary": "Modified instance",
+    "start": {
+        "dateTime": "2022-04-20T10:00:00-06:00",
+        "timeZone": "America/Regina",
+    },
+    "end": {
+        "dateTime": "2022-04-20T11:00:00-06:00",
+        "timeZone": "America/Regina",
+    },
+    "recurringEventId": "some-event-id-4",
+    "originalStartTime": {
+        "dateTime": "2022-04-20T09:00:00-06:00",
+        "timeZone": "America/Regina",
+    },
+    "status": "confirmed",
+}
+FLOATING_RECURRING_EVENT = {
+    "id": "some-event-id-5",
+    "iCalUID": "some-event-id-5@google.com",
+    "summary": "Event 5",
+    "start": {
+        "dateTime": "2022-04-13T09:00:00",
+    },
+    "end": {
+        "dateTime": "2022-04-13T10:00:00",
+    },
+    "status": "confirmed",
+    "recurrence": [
+        "RRULE:FREQ=WEEKLY;COUNT=5",
+    ],
+}
+# Modified instance of FLOATING_RECURRING_EVENT with an id that is not a
+# synthetic event id since the original start time has no UTC offset
+FLOATING_MODIFIED_INSTANCE = {
+    "id": "some-event-id-5_20220420T090000",
+    "iCalUID": "some-event-id-5@google.com",
+    "summary": "Modified instance",
+    "start": {
+        "dateTime": "2022-04-20T10:00:00",
+    },
+    "end": {
+        "dateTime": "2022-04-20T11:00:00",
+    },
+    "recurringEventId": "some-event-id-5",
+    "originalStartTime": {
+        "dateTime": "2022-04-20T09:00:00",
+    },
+    "status": "confirmed",
+}
 
 
 @pytest.mark.parametrize(
@@ -1225,14 +1295,6 @@ CANCELLED_INSTANCE = {
             "some-event-id-1_20220504",
             {"id": "some-event-id-1_20220504", "status": "cancelled"},
             id="instance",
-        ),
-        pytest.param(
-            [CANCELLED_INSTANCE, RECURRING_EVENT],
-            "some-event-id-1_20220504",
-            Range.NONE,
-            "some-event-id-1_20220504",
-            {"id": "some-event-id-1_20220504", "status": "cancelled"},
-            id="cancelled-instance",
         ),
         pytest.param(
             MODIFIED_INSTANCES,
@@ -1279,6 +1341,44 @@ CANCELLED_INSTANCE = {
             "some-event-id-3",
             None,
             id="single-event",
+        ),
+        pytest.param(
+            [TIMED_MODIFIED_INSTANCE, TIMED_RECURRING_EVENT],
+            "some-event-id-4_20220420T150000Z",
+            Range.NONE,
+            "some-event-id-4_20220420T150000Z",
+            {"id": "some-event-id-4_20220420T150000Z", "status": "cancelled"},
+            id="timed-modified-instance",
+        ),
+        pytest.param(
+            [TIMED_MODIFIED_INSTANCE, TIMED_RECURRING_EVENT],
+            "some-event-id-4_20220420T150000Z",
+            Range.THIS_AND_FUTURE,
+            "some-event-id-4",
+            {
+                "id": "some-event-id-4",
+                "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20220419T150000Z"],
+            },
+            id="timed-future-from-modified-instance",
+        ),
+        pytest.param(
+            [FLOATING_MODIFIED_INSTANCE, FLOATING_RECURRING_EVENT],
+            "some-event-id-5_20220420T090000",
+            Range.NONE,
+            "some-event-id-5_20220420T090000",
+            {"id": "some-event-id-5_20220420T090000", "status": "cancelled"},
+            id="floating-modified-instance",
+        ),
+        pytest.param(
+            [FLOATING_MODIFIED_INSTANCE, FLOATING_RECURRING_EVENT],
+            "some-event-id-5_20220420T090000",
+            Range.THIS_AND_FUTURE,
+            "some-event-id-5",
+            {
+                "id": "some-event-id-5",
+                "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20220419T090000"],
+            },
+            id="floating-future-from-modified-instance",
         ),
     ],
 )
@@ -1408,6 +1508,38 @@ async def test_delete_event_with_modified_instances(
             Range.NONE,
             "Mismatched ids",
             id="mismatched-modified-instance-without-recurring-event",
+        ),
+        pytest.param(
+            [CANCELLED_INSTANCE, RECURRING_EVENT],
+            "some-event-id-1@google.com",
+            "some-event-id-1_20220504",
+            Range.NONE,
+            "Event does not exist",
+            id="cancelled-instance",
+        ),
+        pytest.param(
+            [CANCELLED_INSTANCE, RECURRING_EVENT],
+            "some-event-id-1@google.com",
+            "some-event-id-1_20220504",
+            Range.THIS_AND_FUTURE,
+            "Event does not exist",
+            id="future-from-cancelled-instance",
+        ),
+        pytest.param(
+            [{key: value for key, value in SINGLE_EVENT.items() if key != "iCalUID"}],
+            "",
+            None,
+            Range.NONE,
+            "Event does not exist",
+            id="empty-ical-uuid",
+        ),
+        pytest.param(
+            [{key: value for key, value in SINGLE_EVENT.items() if key != "iCalUID"}],
+            "",
+            "some-event-id-3",
+            Range.NONE,
+            "Event does not exist",
+            id="empty-ical-uuid-with-event-id",
         ),
     ],
 )

@@ -646,7 +646,8 @@ class CalendarEventStoreService:
         A `ValueError` is raised when the targeted event is not in the local store,
         including when only modified instances of a recurring event are stored but
         not the recurring event itself (except for deleting such an instance with
-        `Range.NONE`), or when the `event_id` does not belong to the `ical_uuid`.
+        `Range.NONE`), when the `event_id` refers to an event or instance that was
+        already cancelled, or when the `event_id` does not belong to the `ical_uuid`.
         """
         event, primary_event_id, synthetic_event_id = await self._async_resolve_event(
             ical_uuid, event_id, recurrence_range
@@ -688,8 +689,11 @@ class CalendarEventStoreService:
 
         Modified instances of a recurring event share the iCalUID of the recurring
         event, so an `event_id` is resolved by id and the `ical_uuid` is only used
-        to validate it. Cancelled events in the store are ignored.
+        to validate it. Cancelled events in the store are ignored, and targeting a
+        cancelled event or instance by its `event_id` raises a `ValueError`.
         """
+        if not ical_uuid:
+            raise ValueError("Event does not exist: ical_uuid is required")
         events_data = await self._lookup_events_data()
         if not event_id:
             if (
@@ -699,25 +703,37 @@ class CalendarEventStoreService:
                 raise ValueError(f"Event does not exist: {ical_uuid} or malformed")
             return event, event.id, None
 
-        if recurrence_range == Range.NONE and (
-            event := _lookup_event_id(events_data, event_id)
+        if (data := events_data.get(event_id)) and (
+            data.get("status") == EventStatusEnum.CANCELLED
         ):
+            raise ValueError(f"Event does not exist: {event_id} was cancelled")
+
+        synthetic_event_id: SyntheticEventId | None = None
+        if event := _lookup_event_id(events_data, event_id):
             _validate_ical_uuid(event, ical_uuid, event_id)
-            if event.recurring_event_id and SyntheticEventId.is_valid(event_id):
-                # A modified instance of a recurring event
-                return (
-                    event,
-                    event.recurring_event_id,
-                    SyntheticEventId.parse(event_id),
-                )
-            if not event.recurrence:
+            if event.recurring_event_id:
+                # A modified instance of a recurring event. Its id is assigned by
+                # the calendar API and is not necessarily a synthetic event id,
+                # e.g. for events with a floating time.
+                if event.original_start_time:
+                    synthetic_event_id = SyntheticEventId.of(
+                        event.recurring_event_id, event.original_start_time.value
+                    )
+                elif SyntheticEventId.is_valid(event_id):
+                    synthetic_event_id = SyntheticEventId.parse(event_id)
+                else:
+                    raise ValueError(f"Event does not exist: {event_id} or malformed")
+                if recurrence_range == Range.NONE:
+                    return event, event.recurring_event_id, synthetic_event_id
+            elif recurrence_range == Range.NONE and not event.recurrence:
                 # A single event
                 return event, event_id, None
 
         # An instance of a recurring event, resolved via the recurring event
-        if not SyntheticEventId.is_valid(event_id):
-            raise ValueError(f"Event does not exist: {event_id} or malformed")
-        synthetic_event_id = SyntheticEventId.parse(event_id)
+        if synthetic_event_id is None:
+            if not SyntheticEventId.is_valid(event_id):
+                raise ValueError(f"Event does not exist: {event_id} or malformed")
+            synthetic_event_id = SyntheticEventId.parse(event_id)
         primary_event_id = synthetic_event_id.original_event_id
         event = _lookup_event_id(events_data, primary_event_id)
         if not event or not event.recurrence:
@@ -755,9 +771,13 @@ class CalendarEventStoreService:
         # setting the "until" field won't create more instances by changing count.
         # UNTIL is inclusive so it can't include the specified exdate. FREQ=DAILY
         # is the lowest frequency supported so subtracting one day is
-        # safe and works for both dates and datetimes.
+        # safe and works for both dates and datetimes. An UNTIL with a time zone
+        # must be specified in UTC.
+        until = synthetic_event_id.dtstart - datetime.timedelta(days=1)
+        if isinstance(until, datetime.datetime) and until.tzinfo is not None:
+            until = until.astimezone(datetime.UTC)
         recur.rrule[0].count = None
-        recur.rrule[0].until = synthetic_event_id.dtstart - datetime.timedelta(days=1)
+        recur.rrule[0].until = until
         updated_event = Event(
             id=primary_event_id,  # Primary event
             recurrence=recur.as_recurrence(),
