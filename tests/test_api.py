@@ -2,6 +2,7 @@
 
 import datetime
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 import aiohttp
 import pytest
@@ -1118,187 +1119,320 @@ async def test_delete_missing_event(
         )
 
 
-async def test_delete_recurring_event_and_future_with_modified_instance(
-    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
-    json_response: ApiResult,
-    url_request: Callable[[], str],
-    json_request: Callable[[], str],
-) -> None:
-    """Test deleting future instances resolves the recurring event, not a modified instance."""
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "some-event-id-1_20220420",
-                    "iCalUID": "some-event-id-1@google.com",
-                    "summary": "Modified instance",
-                    "start": {
-                        "date": "2022-04-21",
-                    },
-                    "end": {
-                        "date": "2022-04-22",
-                    },
-                    "recurringEventId": "some-event-id-1",
-                    "originalStartTime": {
-                        "date": "2022-04-20",
-                    },
-                    "status": "confirmed",
-                },
-                {
-                    "id": "some-event-id-1",
-                    "iCalUID": "some-event-id-1@google.com",
-                    "summary": "Event 1",
-                    "start": {
-                        "date": "2022-04-13",
-                    },
-                    "end": {
-                        "date": "2022-04-14",
-                    },
-                    "status": "confirmed",
-                    "recurrence": [
-                        "RRULE:FREQ=WEEKLY;COUNT=5",
-                    ],
-                },
-            ],
-            "nextSyncToken": "sync-token-1",
-        }
-    )
-    json_response({})
-    sync = await event_sync_manager_cb()
-    await sync.run()
-    await sync.store_service.async_delete_event(
-        ical_uuid="some-event-id-1@google.com",
-        event_id="some-event-id-1_20220420",
-        recurrence_range=Range.THIS_AND_FUTURE,
-    )
-    assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
-        "/calendars/some-calendar-id/events/some-event-id-1",
-    ]
-    assert json_request() == [
-        {
-            "id": "some-event-id-1",
-            "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20220419"],
-        }
-    ]
-
-
-async def test_delete_modified_instance_with_recurring_event(
-    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
-    json_response: ApiResult,
-    url_request: Callable[[], str],
-    json_request: Callable[[], str],
-) -> None:
-    """Test deleting instances when a modified instance and its recurring event are stored."""
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "some-event-id-1_20220420",
-                    "iCalUID": "some-event-id-1@google.com",
-                    "summary": "Modified instance",
-                    "start": {
-                        "date": "2022-04-21",
-                    },
-                    "end": {
-                        "date": "2022-04-22",
-                    },
-                    "recurringEventId": "some-event-id-1",
-                    "originalStartTime": {
-                        "date": "2022-04-20",
-                    },
-                    "status": "confirmed",
-                },
-                {
-                    "id": "some-event-id-1",
-                    "iCalUID": "some-event-id-1@google.com",
-                    "summary": "Event 1",
-                    "start": {
-                        "date": "2022-04-13",
-                    },
-                    "end": {
-                        "date": "2022-04-14",
-                    },
-                    "status": "confirmed",
-                    "recurrence": [
-                        "RRULE:FREQ=WEEKLY;COUNT=5",
-                    ],
-                },
-            ],
-            "nextSyncToken": "sync-token-1",
-        }
-    )
-    json_response({})
-    sync = await event_sync_manager_cb()
-    await sync.run()
-    # The modified instance itself
-    await sync.store_service.async_delete_event(
-        ical_uuid="some-event-id-1@google.com",
-        event_id="some-event-id-1_20220420",
-        recurrence_range=Range.NONE,
-    )
-    # Another instance of the recurring event
-    await sync.store_service.async_delete_event(
-        ical_uuid="some-event-id-1@google.com",
-        event_id="some-event-id-1_20220427",
-        recurrence_range=Range.NONE,
-    )
-    assert url_request() == [
-        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
-        "/calendars/some-calendar-id/events/some-event-id-1_20220420",
-        "/calendars/some-calendar-id/events/some-event-id-1_20220427",
-    ]
-    assert json_request() == [
-        {
-            "id": "some-event-id-1_20220420",
-            "status": "cancelled",
+RECURRING_EVENT = {
+    "id": "some-event-id-1",
+    "iCalUID": "some-event-id-1@google.com",
+    "summary": "Event 1",
+    "start": {
+        "date": "2022-04-13",
+    },
+    "end": {
+        "date": "2022-04-14",
+    },
+    "status": "confirmed",
+    "recurrence": [
+        "RRULE:FREQ=WEEKLY;COUNT=5",
+    ],
+}
+CANCELLED_RECURRING_EVENT = {
+    "id": "some-event-id-1",
+    "iCalUID": "some-event-id-1@google.com",
+    "status": "cancelled",
+}
+OTHER_RECURRING_EVENT = {
+    **RECURRING_EVENT,
+    "id": "some-event-id-2",
+    "iCalUID": "some-event-id-2@google.com",
+    "summary": "Event 2",
+}
+SINGLE_EVENT = {
+    "id": "some-event-id-3",
+    "iCalUID": "some-event-id-3@google.com",
+    "summary": "Event 3",
+    "start": {
+        "date": "2022-04-13",
+    },
+    "end": {
+        "date": "2022-04-14",
+    },
+    "status": "confirmed",
+}
+# Modified instances of RECURRING_EVENT moved by a day
+MODIFIED_INSTANCES = [
+    {
+        "id": f"some-event-id-1_{original_start.replace('-', '')}",
+        "iCalUID": "some-event-id-1@google.com",
+        "summary": "Modified instance",
+        "start": {
+            "date": start,
         },
-        {
-            "id": "some-event-id-1_20220427",
-            "status": "cancelled",
+        "end": {
+            "date": end,
         },
-    ]
+        "recurringEventId": "some-event-id-1",
+        "originalStartTime": {
+            "date": original_start,
+        },
+        "status": "confirmed",
+    }
+    for original_start, start, end in (
+        ("2022-04-20", "2022-04-21", "2022-04-22"),
+        ("2022-04-27", "2022-04-28", "2022-04-29"),
+    )
+]
+CANCELLED_INSTANCE = {
+    "id": "some-event-id-1_20220504",
+    "iCalUID": "some-event-id-1@google.com",
+    "recurringEventId": "some-event-id-1",
+    "originalStartTime": {
+        "date": "2022-05-04",
+    },
+    "status": "cancelled",
+}
 
 
-async def test_delete_modified_instance_without_recurring_event(
+@pytest.mark.parametrize(
+    "items,event_id,recurrence_range,expected_url,expected_body",
+    [
+        pytest.param(
+            [*MODIFIED_INSTANCES, RECURRING_EVENT],
+            None,
+            Range.NONE,
+            "some-event-id-1",
+            None,
+            id="series",
+        ),
+        pytest.param(
+            [CANCELLED_INSTANCE, *MODIFIED_INSTANCES, RECURRING_EVENT],
+            None,
+            Range.NONE,
+            "some-event-id-1",
+            None,
+            id="series-with-cancelled-instance",
+        ),
+        pytest.param(
+            [*MODIFIED_INSTANCES, RECURRING_EVENT],
+            "some-event-id-1_20220420",
+            Range.NONE,
+            "some-event-id-1_20220420",
+            {"id": "some-event-id-1_20220420", "status": "cancelled"},
+            id="modified-instance",
+        ),
+        pytest.param(
+            [*MODIFIED_INSTANCES, RECURRING_EVENT],
+            "some-event-id-1_20220504",
+            Range.NONE,
+            "some-event-id-1_20220504",
+            {"id": "some-event-id-1_20220504", "status": "cancelled"},
+            id="instance",
+        ),
+        pytest.param(
+            [CANCELLED_INSTANCE, RECURRING_EVENT],
+            "some-event-id-1_20220504",
+            Range.NONE,
+            "some-event-id-1_20220504",
+            {"id": "some-event-id-1_20220504", "status": "cancelled"},
+            id="cancelled-instance",
+        ),
+        pytest.param(
+            MODIFIED_INSTANCES,
+            "some-event-id-1_20220427",
+            Range.NONE,
+            "some-event-id-1_20220427",
+            {"id": "some-event-id-1_20220427", "status": "cancelled"},
+            id="modified-instance-without-recurring-event",
+        ),
+        pytest.param(
+            [*MODIFIED_INSTANCES, RECURRING_EVENT],
+            "some-event-id-1_20220420",
+            Range.THIS_AND_FUTURE,
+            "some-event-id-1",
+            {
+                "id": "some-event-id-1",
+                "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20220419"],
+            },
+            id="future-from-modified-instance",
+        ),
+        pytest.param(
+            [*MODIFIED_INSTANCES, RECURRING_EVENT],
+            "some-event-id-1_20220504",
+            Range.THIS_AND_FUTURE,
+            "some-event-id-1",
+            {
+                "id": "some-event-id-1",
+                "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20220503"],
+            },
+            id="future-from-instance",
+        ),
+        pytest.param(
+            [*MODIFIED_INSTANCES, RECURRING_EVENT],
+            "some-event-id-1_20220413",
+            Range.THIS_AND_FUTURE,
+            "some-event-id-1",
+            None,
+            id="future-from-first-instance",
+        ),
+        pytest.param(
+            [SINGLE_EVENT],
+            "some-event-id-3",
+            Range.NONE,
+            "some-event-id-3",
+            None,
+            id="single-event",
+        ),
+    ],
+)
+async def test_delete_event_with_modified_instances(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     json_response: ApiResult,
-    url_request: Callable[[], str],
+    url_request: Callable[[], list[str]],
+    json_request: ApiRequest,
+    items: list[dict[str, Any]],
+    event_id: str | None,
+    recurrence_range: Range,
+    expected_url: str,
+    expected_body: dict[str, Any] | None,
 ) -> None:
-    """Test a modified instance is still found when its recurring event is not stored."""
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "some-event-id-1_20220420",
-                    "iCalUID": "some-event-id-1@google.com",
-                    "summary": "Modified instance",
-                    "start": {
-                        "date": "2022-04-21",
-                    },
-                    "end": {
-                        "date": "2022-04-22",
-                    },
-                    "recurringEventId": "some-event-id-1",
-                    "originalStartTime": {
-                        "date": "2022-04-20",
-                    },
-                    "status": "confirmed",
-                },
-            ],
-            "nextSyncToken": "sync-token-1",
-        }
-    )
+    """Test deleting events resolves the event by id, not by a modified instance."""
+    json_response({"items": items, "nextSyncToken": "sync-token-1"})
     json_response({})
     sync = await event_sync_manager_cb()
     await sync.run()
     await sync.store_service.async_delete_event(
-        ical_uuid="some-event-id-1@google.com",
-        event_id="some-event-id-1_20220420",
+        ical_uuid=items[-1]["iCalUID"],
+        event_id=event_id,
+        recurrence_range=recurrence_range,
     )
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
-        "/calendars/some-calendar-id/events/some-event-id-1_20220420",
+        f"/calendars/some-calendar-id/events/{expected_url}",
+    ]
+    assert json_request() == ([expected_body] if expected_body else [])
+
+
+@pytest.mark.parametrize(
+    "items,ical_uuid,event_id,recurrence_range,match",
+    [
+        pytest.param(
+            MODIFIED_INSTANCES,
+            "some-event-id-1@google.com",
+            None,
+            Range.NONE,
+            "Event does not exist",
+            id="series-without-recurring-event",
+        ),
+        pytest.param(
+            MODIFIED_INSTANCES,
+            "some-event-id-1@google.com",
+            "some-event-id-1_20220504",
+            Range.NONE,
+            "Event does not exist",
+            id="instance-without-recurring-event",
+        ),
+        pytest.param(
+            MODIFIED_INSTANCES,
+            "some-event-id-1@google.com",
+            "some-event-id-1_20220420",
+            Range.THIS_AND_FUTURE,
+            "Event does not exist",
+            id="future-without-recurring-event",
+        ),
+        pytest.param(
+            [*MODIFIED_INSTANCES, CANCELLED_RECURRING_EVENT],
+            "some-event-id-1@google.com",
+            None,
+            Range.NONE,
+            "Event does not exist",
+            id="series-cancelled",
+        ),
+        pytest.param(
+            [*MODIFIED_INSTANCES, CANCELLED_RECURRING_EVENT],
+            "some-event-id-1@google.com",
+            "some-event-id-1_20220504",
+            Range.NONE,
+            "Event does not exist",
+            id="instance-of-cancelled-series",
+        ),
+        pytest.param(
+            [*MODIFIED_INSTANCES, CANCELLED_RECURRING_EVENT],
+            "some-event-id-1@google.com",
+            "some-event-id-1_20220427",
+            Range.THIS_AND_FUTURE,
+            "Event does not exist",
+            id="future-of-cancelled-series",
+        ),
+        pytest.param(
+            [{**SINGLE_EVENT, "status": "cancelled"}],
+            "some-event-id-3@google.com",
+            "some-event-id-3",
+            Range.NONE,
+            "Event does not exist",
+            id="cancelled-single-event",
+        ),
+        pytest.param(
+            [{**SINGLE_EVENT, "status": "cancelled"}],
+            "some-event-id-3@google.com",
+            None,
+            Range.NONE,
+            "Event does not exist",
+            id="cancelled-single-event-without-event-id",
+        ),
+        pytest.param(
+            [*MODIFIED_INSTANCES, RECURRING_EVENT, OTHER_RECURRING_EVENT],
+            "some-event-id-1@google.com",
+            "some-event-id-2_20220420",
+            Range.NONE,
+            "Mismatched ids",
+            id="mismatched-instance",
+        ),
+        pytest.param(
+            [*MODIFIED_INSTANCES, RECURRING_EVENT, OTHER_RECURRING_EVENT],
+            "some-event-id-2@google.com",
+            "some-event-id-1_20220420",
+            Range.NONE,
+            "Mismatched ids",
+            id="mismatched-modified-instance",
+        ),
+        pytest.param(
+            [*MODIFIED_INSTANCES, RECURRING_EVENT, OTHER_RECURRING_EVENT],
+            "some-event-id-2@google.com",
+            "some-event-id-1_20220427",
+            Range.THIS_AND_FUTURE,
+            "Mismatched ids",
+            id="mismatched-future",
+        ),
+        pytest.param(
+            MODIFIED_INSTANCES,
+            "some-event-id-2@google.com",
+            "some-event-id-1_20220420",
+            Range.NONE,
+            "Mismatched ids",
+            id="mismatched-modified-instance-without-recurring-event",
+        ),
+    ],
+)
+async def test_delete_event_with_modified_instances_invalid(
+    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    json_response: ApiResult,
+    url_request: Callable[[], list[str]],
+    items: list[dict[str, Any]],
+    ical_uuid: str,
+    event_id: str | None,
+    recurrence_range: Range,
+    match: str,
+) -> None:
+    """Test deleting events that can't be resolved to the recurring event."""
+    json_response({"items": items, "nextSyncToken": "sync-token-1"})
+    sync = await event_sync_manager_cb()
+    await sync.run()
+    with pytest.raises(ValueError, match=match):
+        await sync.store_service.async_delete_event(
+            ical_uuid=ical_uuid,
+            event_id=event_id,
+            recurrence_range=recurrence_range,
+        )
+    assert url_request() == [
+        f"/calendars/some-calendar-id/events?{EVENT_SYNC_PARAMS}",
     ]
 
 
