@@ -1259,6 +1259,15 @@ FLOATING_MODIFIED_INSTANCE = {
     },
     "status": "confirmed",
 }
+RDATE_RECURRING_EVENT = {
+    **RECURRING_EVENT,
+    "id": "some-event-id-6",
+    "iCalUID": "some-event-id-6@google.com",
+    "summary": "Event 6",
+    "recurrence": [
+        "RDATE;VALUE=DATE:20220420,20220427",
+    ],
+}
 
 
 @pytest.mark.parametrize(
@@ -1540,6 +1549,14 @@ async def test_delete_event_with_modified_instances(
             Range.NONE,
             "Event does not exist",
             id="empty-ical-uuid-with-event-id",
+        ),
+        pytest.param(
+            [RDATE_RECURRING_EVENT],
+            "some-event-id-6@google.com",
+            "some-event-id-6_20220420",
+            Range.THIS_AND_FUTURE,
+            "without exactly one RRULE",
+            id="future-from-rdate-only-instance",
         ),
     ],
 )

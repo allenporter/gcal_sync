@@ -764,8 +764,10 @@ class CalendarEventStoreService:
         if not (recur := event.recur):
             raise ValueError(f"Unable to update RRULE, does not conform: {recur}")
 
-        if len(recur.rrule) > 1:
-            raise ValueError(f"Can't update event with multiple RRULE: {recur.rrule}")
+        if len(recur.rrule) != 1:
+            raise ValueError(
+                f"Can't update event without exactly one RRULE: {recur.rrule}"
+            )
 
         # Stop recurring events before the specified date. This assumes that
         # setting the "until" field won't create more instances by changing count.
