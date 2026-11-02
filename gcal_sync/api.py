@@ -520,6 +520,39 @@ class Range(str, enum.Enum):
     """The range of the recurrence identifier and all subsequent values."""
 
 
+def _lookup_event_id(events_data: dict[str, Any], event_id: str) -> Event | None:
+    """Find the event with the specified id in the store, ignoring cancelled events."""
+    if not (data := events_data.get(event_id)) or (
+        data.get("status") == EventStatusEnum.CANCELLED
+    ):
+        return None
+    return Event(**data)
+
+
+def _lookup_primary_event(events_data: dict[str, Any], ical_uuid: str) -> Event | None:
+    """Find the event with the iCalUID in the store, ignoring cancelled events.
+
+    Modified instances of a recurring event share the iCalUID of the recurring
+    event, so they are skipped and only the primary event itself is returned.
+    """
+    for data in events_data.values():
+        if (
+            data.get("ical_uuid") == ical_uuid
+            and not data.get("recurring_event_id")
+            and data.get("status") != EventStatusEnum.CANCELLED
+        ):
+            return Event(**data)
+    return None
+
+
+def _validate_ical_uuid(event: Event, ical_uuid: str, event_id: str) -> None:
+    """Raise if the stored event does not belong to the iCalUID."""
+    if event.ical_uuid != ical_uuid:
+        raise ValueError(
+            f"Mismatched ids ical_uuid={ical_uuid} and event_id={event_id}"
+        )
+
+
 class CalendarEventStoreService:
     """Performs event lookups from the local store.
 
@@ -609,30 +642,20 @@ class CalendarEventStoreService:
         commands to send to the calendar API, so it may be operating on stale data.
         You should sync the event store after performing a delete operation to
         ensure the store reflects the latest information from the server
+
+        A `ValueError` is raised when the targeted event is not in the local store,
+        including when only modified instances of a recurring event are stored but
+        not the recurring event itself (except for deleting such an instance with
+        `Range.NONE`), when the `event_id` refers to an event or instance that was
+        already cancelled, or when the `event_id` does not belong to the `ical_uuid`.
         """
-        event = await self._lookup_ical_uuid(ical_uuid)
-        if not event or not event.id:
-            raise ValueError(f"Event does not exist: {ical_uuid} or malformed")
-
-        if (
-            event_id
-            and recurrence_range == Range.THIS_AND_FUTURE
-            and SyntheticEventId.parse(event_id).dtstart == event.start.value
-        ):
-            # Editing the first instance and all forward is the same as deleting
-            # the entire series so don't bother forking a new event
-            event_id = None
-
-        if not event_id or not event.recurrence:
+        event, primary_event_id, synthetic_event_id = await self._async_resolve_event(
+            ical_uuid, event_id, recurrence_range
+        )
+        if not event_id or synthetic_event_id is None:
             # Deleting a single event or entire series of a recurring event
-            await self._api.async_delete_event(self._calendar_id, event.id)
+            await self._api.async_delete_event(self._calendar_id, primary_event_id)
             return
-
-        synthetic_event_id = SyntheticEventId.parse(event_id)
-        if synthetic_event_id.original_event_id != event.id:
-            raise ValueError(
-                f"Mismatched ids ical_uuid={ical_uuid} and event_id={event_id}"
-            )
 
         if recurrence_range == Range.NONE:
             # A single recurrence instance is removed, marked as cancelled
@@ -650,23 +673,115 @@ class CalendarEventStoreService:
             await self._api.async_patch_event(self._calendar_id, event_id, body)
             return
 
+        await self._async_truncate_series(event, primary_event_id, synthetic_event_id)
+
+    async def _async_resolve_event(
+        self,
+        ical_uuid: str,
+        event_id: str | None,
+        recurrence_range: Range,
+    ) -> tuple[Event, str, SyntheticEventId | None]:
+        """Resolve the stored event targeted by a mutation.
+
+        Returns the stored event, its primary event id, and the parsed instance id
+        when the mutation targets instances of a recurring event. The instance id
+        is None when the mutation applies to a single event or an entire series.
+
+        Modified instances of a recurring event share the iCalUID of the recurring
+        event, so an `event_id` is resolved by id and the `ical_uuid` is only used
+        to validate it. Cancelled events in the store are ignored, and targeting a
+        cancelled event or instance by its `event_id` raises a `ValueError`.
+        """
+        if not ical_uuid:
+            raise ValueError("Event does not exist: ical_uuid is required")
+        events_data = await self._lookup_events_data()
+        if not event_id:
+            if (
+                not (event := _lookup_primary_event(events_data, ical_uuid))
+                or not event.id
+            ):
+                raise ValueError(f"Event does not exist: {ical_uuid} or malformed")
+            return event, event.id, None
+
+        if (data := events_data.get(event_id)) and (
+            data.get("status") == EventStatusEnum.CANCELLED
+        ):
+            raise ValueError(f"Event does not exist: {event_id} was cancelled")
+
+        synthetic_event_id: SyntheticEventId | None = None
+        if event := _lookup_event_id(events_data, event_id):
+            _validate_ical_uuid(event, ical_uuid, event_id)
+            if event.recurring_event_id:
+                # A modified instance of a recurring event. Its id is assigned by
+                # the calendar API and is not necessarily a synthetic event id,
+                # e.g. for events with a floating time.
+                if event.original_start_time:
+                    synthetic_event_id = SyntheticEventId.of(
+                        event.recurring_event_id, event.original_start_time.value
+                    )
+                elif SyntheticEventId.is_valid(event_id):
+                    synthetic_event_id = SyntheticEventId.parse(event_id)
+                else:
+                    raise ValueError(f"Event does not exist: {event_id} or malformed")
+                if recurrence_range == Range.NONE:
+                    return event, event.recurring_event_id, synthetic_event_id
+            elif recurrence_range == Range.NONE and not event.recurrence:
+                # A single event
+                return event, event_id, None
+
+        # An instance of a recurring event, resolved via the recurring event
+        if synthetic_event_id is None:
+            if not SyntheticEventId.is_valid(event_id):
+                raise ValueError(f"Event does not exist: {event_id} or malformed")
+            synthetic_event_id = SyntheticEventId.parse(event_id)
+        primary_event_id = synthetic_event_id.original_event_id
+        event = _lookup_event_id(events_data, primary_event_id)
+        if not event or not event.recurrence:
+            raise ValueError(
+                f"Event does not exist: recurring event {primary_event_id} of "
+                f"{event_id} is not in the store"
+            )
+        _validate_ical_uuid(event, ical_uuid, event_id)
+
+        if (
+            recurrence_range == Range.THIS_AND_FUTURE
+            and synthetic_event_id.dtstart == event.start.value
+        ):
+            # Editing the first instance and all forward is the same as editing
+            # the entire series so don't bother forking a new event
+            return event, primary_event_id, None
+        return event, primary_event_id, synthetic_event_id
+
+    async def _async_truncate_series(
+        self,
+        event: Event,
+        primary_event_id: str,
+        synthetic_event_id: SyntheticEventId,
+    ) -> None:
+        """End a recurring series before the specified instance."""
         # Assumes any recurrence deletion is valid, and that overwriting
         # the "until" value will not produce more instances.
         if not (recur := event.recur):
             raise ValueError(f"Unable to update RRULE, does not conform: {recur}")
 
-        if len(recur.rrule) > 1:
-            raise ValueError(f"Can't update event with multiple RRULE: {recur.rrule}")
+        if len(recur.rrule) != 1:
+            raise ValueError(
+                f"Can't update event without exactly one RRULE: {recur.rrule}"
+            )
 
         # Stop recurring events before the specified date. This assumes that
         # setting the "until" field won't create more instances by changing count.
         # UNTIL is inclusive so it can't include the specified exdate. FREQ=DAILY
         # is the lowest frequency supported so subtracting one day is
-        # safe and works for both dates and datetimes.
+        # safe and works for both dates and datetimes. An UNTIL with a time zone
+        # must be specified in UTC.
+        until = synthetic_event_id.dtstart - datetime.timedelta(days=1)
+        if isinstance(until, datetime.datetime) and until.tzinfo is not None:
+            until = until.astimezone(datetime.UTC)
         recur.rrule[0].count = None
-        recur.rrule[0].until = synthetic_event_id.dtstart - datetime.timedelta(days=1)
+        recur.rrule[0].until = until
         updated_event = Event(
-            id=event.id,  # Primary event
+            id=primary_event_id,  # Primary event
             recurrence=recur.as_recurrence(),
             start=event.start,
             end=event.end,
@@ -676,18 +791,10 @@ class CalendarEventStoreService:
         )
         del body["start"]
         del body["end"]
-        await self._api.async_patch_event(self._calendar_id, event.id, body)
+        await self._api.async_patch_event(self._calendar_id, primary_event_id, body)
 
     async def _lookup_events_data(self) -> dict[str, Any]:
         """Loookup the raw events storage dictionary."""
         store_data = await self._store.async_load() or {}
         store_data.setdefault(ITEMS, {})
         return store_data.get(ITEMS, {})  # type: ignore[no-any-return]
-
-    async def _lookup_ical_uuid(self, ical_uuid: str) -> Event | None:
-        """Find the specified event by id in the local store."""
-        events_data = await self._lookup_events_data()
-        for data in events_data.values():
-            if (event_uuid := data.get("ical_uuid")) and event_uuid == ical_uuid:
-                return Event(**data)
-        return None
