@@ -896,10 +896,9 @@ class Event(CalendarBaseModel):
             ):
                 # Date should be floating
                 return date_value.replace(tzinfo=None)
-        elif dtstart.date:
-            if isinstance(date_value, datetime.datetime):
-                # UNTIL is a DATE-TIME but must be a DATE
-                return date_value.date()
+        elif dtstart.date and isinstance(date_value, datetime.datetime):
+            # UNTIL is a DATE-TIME but must be a DATE
+            return date_value.date()
         return date_value
 
     @model_validator(mode="before")
