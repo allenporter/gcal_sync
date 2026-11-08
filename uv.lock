@@ -197,7 +197,7 @@ wheels = [
 
 [[package]]
 name = "gcal-sync"
-version = "9.2.0"
+version = "9.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
