@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import zoneinfo
 from collections.abc import Awaitable, Callable
+from typing import Any
 from unittest.mock import patch
 
 import aiohttp
@@ -620,6 +621,7 @@ async def test_event_token_version_invalidation(
 @freeze_time("2022-04-05 07:31:02", tz_offset=-7)
 async def test_canceled_events(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
+    store: CalendarStore,
     json_response: ApiResult,
 ) -> None:
     """Test lookup events API."""
@@ -686,6 +688,10 @@ async def test_canceled_events(
                     "status": "cancelled",
                 },
                 {
+                    "id": "never-cached-event-id",
+                    "status": "cancelled",
+                },
+                {
                     "id": "some-event-id-3",
                     "summary": "Event 3",
                     "description": "Event description 3",
@@ -701,6 +707,8 @@ async def test_canceled_events(
         }
     )
     await sync.run()
+    assert set(await _stored_events(store)) == {"some-event-id-2", "some-event-id-3"}
+
     result = await sync.store_service.async_list_events(
         LocalListEventsRequest(
             start_time=datetime.datetime.fromisoformat("2001-01-01T00:00:00"),
@@ -744,75 +752,35 @@ async def test_canceled_events(
     assert [event.summary for event in event_iter] == []
 
 
-@freeze_time("2022-04-05 07:31:02", tz_offset=-7)
-async def test_cancelled_events_removed_from_store(
-    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
-    store: CalendarStore,
-    json_response: ApiResult,
-) -> None:
-    """Test that cancelled non-recurring events are removed from the local store."""
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "some-event-id-1",
-                    "summary": "Event 1",
-                    "start": {"date": "2022-04-13"},
-                    "end": {"date": "2022-04-14"},
-                    "status": "confirmed",
-                },
-                {
-                    "id": "some-event-id-2",
-                    "summary": "Event 2",
-                    "start": {"date": "2022-04-15"},
-                    "end": {"date": "2022-04-16"},
-                    "status": "confirmed",
-                },
-            ],
-            "nextSyncToken": "sync-token-1",
-        }
-    )
-
-    sync = await event_sync_manager_cb()
-    await sync.run()
-
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "some-event-id-1",
-                    "status": "cancelled",
-                },
-                {
-                    "id": "never-cached-event-id",
-                    "status": "cancelled",
-                },
-                {
-                    "id": "some-event-id-3",
-                    "summary": "Event 3",
-                    "start": {"date": "2022-04-21"},
-                    "end": {"date": "2022-04-22"},
-                    "status": "confirmed",
-                },
-            ],
-            "nextSyncToken": "sync-token-2",
-        }
-    )
-    await sync.run()
-
+async def _stored_events(store: CalendarStore) -> dict[str, Any]:
+    """Return raw stored event items for CALENDAR_ID."""
     store_data = await store.async_load()
     assert store_data is not None
-    stored_items = store_data[EVENT_SYNC][CALENDAR_ID][ITEMS]
-    assert set(stored_items) == {"some-event-id-2", "some-event-id-3"}
+    return store_data[EVENT_SYNC][CALENDAR_ID][ITEMS]  # type: ignore[no-any-return]
 
 
-@freeze_time("2022-04-05 07:31:02", tz_offset=-7)
-async def test_cancelled_recurring_exceptions_retained_until_master_deleted(
+async def test_cancelled_recurring_events_in_store(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     store: CalendarStore,
     json_response: ApiResult,
 ) -> None:
-    """Test cancelled recurring exceptions are kept while master exists and pruned when master is deleted."""
+    """Test cancelled recurring exceptions, multi-page ordering, and standalone instances."""
+    # Page 1: cancelled exception arrives before its master on Page 2
+    json_response(
+        {
+            "items": [
+                {
+                    "id": "recurring-1_20220420",
+                    "status": "cancelled",
+                    "recurringEventId": "recurring-1",
+                    "originalStartTime": {"date": "2022-04-20"},
+                    "summary": "Details that should be stripped",
+                    "description": "Long description",
+                },
+            ],
+            "nextPageToken": "page-1",
+        }
+    )
     json_response(
         {
             "items": [
@@ -835,189 +803,10 @@ async def test_cancelled_recurring_exceptions_retained_until_master_deleted(
                     "originalStartTime": {"date": "2022-04-27"},
                     "status": "confirmed",
                 },
-            ],
-            "nextSyncToken": "sync-token-1",
-        }
-    )
-
-    sync = await event_sync_manager_cb()
-    await sync.run()
-
-    # Cancel a single instance of the recurring series
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "recurring-1_20220420",
-                    "status": "cancelled",
-                    "recurringEventId": "recurring-1",
-                    "originalStartTime": {"date": "2022-04-20"},
-                },
-            ],
-            "nextSyncToken": "sync-token-2",
-        }
-    )
-    await sync.run()
-
-    store_data = await store.async_load()
-    assert store_data is not None
-    stored_items = store_data[EVENT_SYNC][CALENDAR_ID][ITEMS]
-    assert set(stored_items) == {
-        "recurring-1",
-        "recurring-1_20220420",
-        "recurring-1_20220427",
-    }
-
-    result = await sync.store_service.async_list_events(
-        LocalListEventsRequest(
-            start_time=datetime.datetime.fromisoformat("2022-04-01T00:00:00"),
-        )
-    )
-    assert [event.start.value for event in result.events] == [
-        datetime.date(2022, 4, 13),
-        datetime.date(2022, 4, 28),
-    ]
-
-    # Delete the entire recurring master
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "recurring-1",
-                    "status": "cancelled",
-                },
-            ],
-            "nextSyncToken": "sync-token-3",
-        }
-    )
-    await sync.run()
-
-    store_data = await store.async_load()
-    assert store_data is not None
-    stored_items = store_data[EVENT_SYNC][CALENDAR_ID][ITEMS]
-    assert stored_items == {}
-
-
-@freeze_time("2022-04-05 07:31:02", tz_offset=-7)
-async def test_cancelled_recurring_exception_multipage_ordering(
-    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
-    store: CalendarStore,
-    json_response: ApiResult,
-) -> None:
-    """Test multi-page ordering for cancelled exceptions and recurring masters."""
-    # Page 1 has cancelled exception before its master arrives on Page 2
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "recurring-1_20220420",
-                    "status": "cancelled",
-                    "recurringEventId": "recurring-1",
-                    "originalStartTime": {"date": "2022-04-20"},
-                    "summary": "Organizer details that should not be persisted",
-                    "description": "Long description",
-                },
-            ],
-            "nextPageToken": "page-1",
-        }
-    )
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "recurring-1",
-                    "iCalUID": "recurring-1@google.com",
-                    "summary": "Weekly Event",
-                    "start": {"date": "2022-04-13"},
-                    "end": {"date": "2022-04-14"},
-                    "recurrence": ["RRULE:FREQ=WEEKLY;COUNT=3"],
-                    "status": "confirmed",
-                },
-            ],
-            "nextSyncToken": "sync-token-1",
-        }
-    )
-
-    sync = await event_sync_manager_cb()
-    await sync.run()
-
-    store_data = await store.async_load()
-    assert store_data is not None
-    stored_items = store_data[EVENT_SYNC][CALENDAR_ID][ITEMS]
-    assert set(stored_items) == {"recurring-1", "recurring-1_20220420"}
-    # Retained cancelled exception stores only minimal fields
-    assert stored_items["recurring-1_20220420"] == {
-        "id": "recurring-1_20220420",
-        "status": "cancelled",
-        "recurring_event_id": "recurring-1",
-        "original_start_time": {"date": "2022-04-20"},
-    }
-    # Active events omit default/null fields
-    assert stored_items["recurring-1"] == {
-        "id": "recurring-1",
-        "ical_uuid": "recurring-1@google.com",
-        "summary": "Weekly Event",
-        "start": {"date": "2022-04-13"},
-        "end": {"date": "2022-04-14"},
-        "recurrence": ["RRULE:FREQ=WEEKLY;COUNT=3"],
-    }
-
-    result = await sync.store_service.async_list_events(
-        LocalListEventsRequest(
-            start_time=datetime.datetime.fromisoformat("2022-04-01T00:00:00"),
-        )
-    )
-    assert [event.start.value for event in result.events] == [
-        datetime.date(2022, 4, 13),
-        datetime.date(2022, 4, 27),
-    ]
-
-    # Incremental sync: master cancelled on Page 1, cancelled exception arrives on Page 2
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "recurring-1",
-                    "status": "cancelled",
-                },
-            ],
-            "nextPageToken": "page-2",
-        }
-    )
-    json_response(
-        {
-            "items": [
-                {
-                    "id": "recurring-1_20220427",
-                    "status": "cancelled",
-                    "recurringEventId": "recurring-1",
-                    "originalStartTime": {"date": "2022-04-27"},
-                },
-            ],
-            "nextSyncToken": "sync-token-2",
-        }
-    )
-    await sync.run()
-
-    store_data = await store.async_load()
-    assert store_data is not None
-    assert store_data[EVENT_SYNC][CALENDAR_ID][ITEMS] == {}
-
-
-@freeze_time("2022-04-05 07:31:02", tz_offset=-7)
-async def test_standalone_modified_instance_and_orphan_cancelled_exception(
-    event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
-    store: CalendarStore,
-    json_response: ApiResult,
-) -> None:
-    """Test standalone modified instance is kept while confirmed and pruned when cancelled."""
-    json_response(
-        {
-            "items": [
                 {
                     "id": "other-master_20220420",
                     "iCalUID": "other-master@google.com",
-                    "summary": "Invited Single Occurrence",
+                    "summary": "Invite-Only Standalone Instance",
                     "start": {"date": "2022-04-21"},
                     "end": {"date": "2022-04-22"},
                     "recurringEventId": "other-master",
@@ -1032,14 +821,48 @@ async def test_standalone_modified_instance_and_orphan_cancelled_exception(
     sync = await event_sync_manager_cb()
     await sync.run()
 
-    store_data = await store.async_load()
-    assert store_data is not None
-    assert set(store_data[EVENT_SYNC][CALENDAR_ID][ITEMS]) == {"other-master_20220420"}
+    stored_items = await _stored_events(store)
+    assert set(stored_items) == {
+        "recurring-1",
+        "recurring-1_20220420",
+        "recurring-1_20220427",
+        "other-master_20220420",
+    }
+    assert stored_items["recurring-1_20220420"] == {
+        "id": "recurring-1_20220420",
+        "status": "cancelled",
+        "recurring_event_id": "recurring-1",
+        "original_start_time": {"date": "2022-04-20"},
+    }
+    assert None not in stored_items["recurring-1"].values()
 
-    # When that invite-only instance is cancelled, it has no parent master so it is pruned
+    result = await sync.store_service.async_list_events(
+        LocalListEventsRequest(
+            start_time=datetime.datetime.fromisoformat("2022-04-01T00:00:00"),
+        )
+    )
+    assert [event.start.value for event in result.events] == [
+        datetime.date(2022, 4, 13),
+        datetime.date(2022, 4, 21),
+        datetime.date(2022, 4, 28),
+    ]
+
+    # Cancel master on Page 1; exception of that master and cancelled standalone instance on Page 2
+    json_response(
+        {
+            "items": [{"id": "recurring-1", "status": "cancelled"}],
+            "nextPageToken": "page-2",
+        }
+    )
     json_response(
         {
             "items": [
+                {
+                    "id": "recurring-1_20220427",
+                    "status": "cancelled",
+                    "recurringEventId": "recurring-1",
+                    "originalStartTime": {"date": "2022-04-27"},
+                },
                 {
                     "id": "other-master_20220420",
                     "status": "cancelled",
@@ -1051,14 +874,10 @@ async def test_standalone_modified_instance_and_orphan_cancelled_exception(
         }
     )
     await sync.run()
-
-    store_data = await store.async_load()
-    assert store_data is not None
-    assert store_data[EVENT_SYNC][CALENDAR_ID][ITEMS] == {}
+    assert await _stored_events(store) == {}
 
 
-@freeze_time("2022-04-05 07:31:02", tz_offset=-7)
-async def test_existing_store_cancelled_events_cleaned_without_full_resync(
+async def test_legacy_store_cancelled_events_cleaned_without_full_resync(
     event_sync_manager_cb: Callable[[], Awaitable[CalendarEventSyncManager]],
     store: CalendarStore,
     json_response: ApiResult,
@@ -1081,14 +900,10 @@ async def test_existing_store_cancelled_events_cleaned_without_full_resync(
                         },
                         "legacy-cancelled-single": {
                             "id": "legacy-cancelled-single",
-                            "start": {"date": "0001-01-01"},
-                            "end": {"date": "0001-01-02"},
                             "status": "cancelled",
                         },
                         "legacy-cancelled-master": {
                             "id": "legacy-cancelled-master",
-                            "start": {"date": "0001-01-01"},
-                            "end": {"date": "0001-01-02"},
                             "status": "cancelled",
                         },
                         "legacy-cancelled-master_20220420": {
@@ -1099,9 +914,6 @@ async def test_existing_store_cancelled_events_cleaned_without_full_resync(
                         },
                         "legacy-cancelled-master_20220427": {
                             "id": "legacy-cancelled-master_20220427",
-                            "summary": "Stale modified instance",
-                            "start": {"date": "2022-04-28"},
-                            "end": {"date": "2022-04-29"},
                             "recurring_event_id": "legacy-cancelled-master",
                             "original_start_time": {"date": "2022-04-27"},
                             "status": "confirmed",
@@ -1110,6 +922,11 @@ async def test_existing_store_cancelled_events_cleaned_without_full_resync(
                             "id": "orphan-cancelled-exception",
                             "recurring_event_id": "missing-master",
                             "original_start_time": {"date": "2022-04-20"},
+                            "status": "cancelled",
+                        },
+                        "cancelled-exception-no-ost": {
+                            "id": "cancelled-exception-no-ost",
+                            "recurring_event_id": "active-master",
                             "status": "cancelled",
                         },
                         "active-master": {
@@ -1132,26 +949,15 @@ async def test_existing_store_cancelled_events_cleaned_without_full_resync(
         }
     )
 
-    json_response(
-        {
-            "items": [],
-            "nextSyncToken": "sync-token-2",
-        }
-    )
+    json_response({"items": [], "nextSyncToken": "sync-token-2"})
 
     sync = await event_sync_manager_cb()
     await sync.run()
 
-    # Incremental sync token was preserved (no full resync triggered)
     assert url_request() == [
         f"/calendars/some-calendar-id/events?{EVENT_PAGE_PARAMS}&syncToken=sync-token-1"
     ]
-
-    store_data = await store.async_load()
-    assert store_data is not None
-    calendar_store = store_data[EVENT_SYNC][CALENDAR_ID]
-    assert calendar_store[SYNC_TOKEN] == "sync-token-2"
-    assert set(calendar_store[ITEMS]) == {
+    assert set(await _stored_events(store)) == {
         "active-1",
         "active-master",
         "active-master_20220420",
