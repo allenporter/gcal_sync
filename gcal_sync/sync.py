@@ -13,7 +13,6 @@ may then query the latest information from the local store service.
 from __future__ import annotations
 
 import datetime
-import json
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -32,6 +31,7 @@ from .api import (
 )
 from .const import CALENDAR_LIST_SYNC, EVENT_SYNC, ITEMS, SYNC_TOKEN, SYNC_TOKEN_VERSION
 from .exceptions import InvalidSyncTokenException
+from .model import Event, EventStatusEnum
 from .store import CalendarStore, InMemoryCalendarStore, ScopedCalendarStore
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,8 +49,44 @@ def _items_func(
     for item in result.items:
         if not item.id:
             continue
-        items[item.id] = json.loads(item.model_dump_json())
+        if isinstance(item, Event) and item.status == EventStatusEnum.CANCELLED:
+            # Convert to a minimal tombstone, stripping event content (summary,
+            # description, attendees, etc.). Deleted non-recurring tombstones are
+            # pruned after all pages complete; recurring exception tombstones are
+            # kept only while their parent recurring event remains active.
+            items[item.id] = item.model_dump(
+                mode="json",
+                include={"id", "status", "recurring_event_id", "original_start_time"},
+                exclude_none=True,
+            )
+        else:
+            items[item.id] = item.model_dump(mode="json", exclude_none=True)
     return items
+
+
+def _prune_cancelled_events(stored_items: dict[str, Any]) -> None:
+    """Remove cancelled events and orphaned recurring exceptions from the store.
+
+    Cancelled exceptions of an active recurring event (those with both
+    `recurring_event_id` and `original_start_time`) must be retained for the
+    lifetime of the parent recurring event so timeline expansion can exclude
+    those cancelled occurrences from the parent's recurrence rule. All other
+    cancelled events and any children of a cancelled recurring master are
+    removed.
+    """
+    to_delete: list[str] = []
+    for item_id, data in stored_items.items():
+        parent_id = data.get("recurring_event_id")
+        parent = stored_items.get(parent_id) if parent_id else None
+        if (
+            parent is not None and parent.get("status") == EventStatusEnum.CANCELLED
+        ) or (
+            data.get("status") == EventStatusEnum.CANCELLED
+            and not (parent is not None and data.get("original_start_time"))
+        ):
+            to_delete.append(item_id)
+    for item_id in to_delete:
+        del stored_items[item_id]
 
 
 async def _run_sync[T: SyncableRequest, S: SyncableResponse](
@@ -208,4 +244,5 @@ class CalendarEventSyncManager:
         store_data = await _run_sync(
             store_data, new_request, self._api.async_list_events_page, _items_func
         )
+        _prune_cancelled_events(store_data[ITEMS])
         await self._store.async_save(store_data)
